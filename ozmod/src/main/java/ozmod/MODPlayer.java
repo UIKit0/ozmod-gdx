@@ -829,7 +829,6 @@ public class MODPlayer extends Thread {
 		int nbsamp = freq_ / (1000 / _time);
 		Arrays.fill(pcm_, (byte) 0);
 		chans_.mix(nbsamp, pcm_);
-		// line_.write(pcm_, 0, nbsamp*4);
 		ByteBuffer.wrap(pcm_).order(ByteOrder.BIG_ENDIAN).asShortBuffer()
 				.get(pcms_, 0, nbsamp * 2);
 		gdxAudio.writeSamples(pcms_, 0, nbsamp * 2);
