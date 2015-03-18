@@ -24,6 +24,7 @@ package ozmod;
 
 import java.io.*;
 import java.net.*;
+import java.util.Arrays;
 
 /**
  * A Class allowing to pass data in from disk or an URL.
@@ -67,6 +68,11 @@ public class PipeIn {
             return readContentFromURL(url_);
          
         return OZMod.proceedError(OZMod.ERR.NEEDINIT);
+    }
+    
+    public void loadContentFromBuffer(byte[] buffer, int _endianness) {
+    	content_ = Arrays.copyOf(buffer, buffer.length);
+    	endianness_ = _endianness;
     }
     
     OZMod.ERR readContentFromFile()
