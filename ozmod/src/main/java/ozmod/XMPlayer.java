@@ -971,7 +971,7 @@ public class XMPlayer extends Thread {
 				cumulTime -= intTimerRate;
 				oneShot(intTimerRate);
 			}
-			doSleep((intTimerRate - cumulTime) / 2);
+			doSleep((intTimerRate - cumulTime)-100);
 		}
 		done_ = true;
 		System.out.println("Done.");

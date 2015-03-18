@@ -23,8 +23,15 @@ package ozmod;
 
 import java.util.*;
 import java.io.*;
+
 import javax.sound.sampled.*;
+
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.audio.AudioDevice;
+
 import java.lang.*;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * A Class to replay IT file.
@@ -86,8 +93,8 @@ public class ITPlayer extends Thread
     boolean isRunning_ = false;
     Timer timer_ = new Timer();
     byte pcm_[];
+    short[] pcms_;
     int frequency_;
-    SourceDataLine line_ = null;
     
     float fltTimerRate_;
     int intTimerRate_;
@@ -1821,23 +1828,19 @@ public class ITPlayer extends Thread
         start(); 
     }
     
+    private AudioDevice gdxAudio;
     /**
      * Never call this method directly. Use play() instead.
      */
     public void run()
     {
         frequency_ = 44100;
-        AudioFormat format = new AudioFormat(frequency_, 16, 2, true, true);
-
-        try {
-            line_ = AudioSystem.getSourceDataLine(format, OZMod.usedMixer_.getMixerInfo());
-            line_.open(format, frequency_);
-      }
-        catch(LineUnavailableException e) {
-        }
+        gdxAudio = Gdx.audio.newAudioDevice(frequency_, false);
+		gdxAudio.setVolume(1f);
         
         int soundBufferLen = frequency_ * 4;
         pcm_ = new byte[soundBufferLen];
+        pcms_ = new short[pcm_.length / 2];
       
         long cumulTime = 0;
         long startTime = timer_.getElapsed();
@@ -1856,24 +1859,22 @@ public class ITPlayer extends Thread
                 
                 oneShot(intTimerRate);
 
-                // wait 100ms before starting the audio line
-                if (lineStarted == false) {
-                    long waitFor = timer_.getElapsed() - startTime;
-                    if (waitFor > 100) {
-                        line_.start();
-                        lineStarted = true;
-                    }
-                }
+                while (cumulTime >= intTimerRate) {
+    				cumulTime -= intTimerRate;
+    				oneShot(intTimerRate);
+    			}
+    			doSleep((intTimerRate - cumulTime)/2);
             }
-
-        //   try {
-               Thread.yield();
-        //    }
-        //    catch (InterruptedException e) {
-          //  }
         }
         done_ = true;
     }
+    
+    private void doSleep(long ms) {
+		try {
+			Thread.sleep(ms);
+		} catch (InterruptedException e) {
+		}
+	}
     
     void oneShot(int timer)
     {
@@ -1920,7 +1921,9 @@ public class ITPlayer extends Thread
         int nbsamp = frequency_ / (1000 / _time);
         Arrays.fill(pcm_,  (byte) 0);
         chansList_.mix(nbsamp, pcm_);
-        line_.write(pcm_, 0, nbsamp*4);
+        ByteBuffer.wrap(pcm_).order(ByteOrder.BIG_ENDIAN).asShortBuffer()
+		.get(pcms_, 0, nbsamp * 2);
+        gdxAudio.writeSamples(pcms_, 0, nbsamp * 2);
     }
 
     int getPeriod(int note, int c5speed)
