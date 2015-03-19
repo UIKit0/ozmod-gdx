@@ -49,40 +49,40 @@ public class Sound {
      * @param _file Filename of the sound.
      * @return NOERR if no error occured.
      */
-    OZMod.ERR load(File _file)
-    {
-        AudioInputStream stream;
-        try {
-            stream = AudioSystem.getAudioInputStream(_file);
-        }
-        catch(IOException e) {
-            return OZMod.proceedError(OZMod.ERR.FILENOTFOUND);
-        }
-        catch(UnsupportedAudioFileException e) {
-            return OZMod.proceedError(OZMod.ERR.INVALIDFORMAT);
-        }
-
-        file_ = _file;
-
-        try {
-            clip_ = AudioSystem.getClip(OZMod.usedMixer_.getMixerInfo());
-            clip_.open(stream);
-        }
-        catch(LineUnavailableException e) {
-            return OZMod.proceedError(OZMod.ERR.DEVICESATURATE);
-        }
-        catch(IOException e) {
-            return OZMod.proceedError(OZMod.ERR.DEVICESATURATE);
-        }
-
-        AudioFormat format = stream.getFormat();
-        nbChannels_ = format.getChannels();
-        frequency_ = (int) format.getSampleRate();
-        nbBits_ = format.getSampleSizeInBits();
-        formatDesc_ = format.toString();
-
-        return OZMod.proceedError(OZMod.ERR.NOERR);
-    }
+//    OZMod.ERR load(File _file)
+//    {
+//        AudioInputStream stream;
+//        try {
+//            stream = AudioSystem.getAudioInputStream(_file);
+//        }
+//        catch(IOException e) {
+//            return OZMod.proceedError(OZMod.ERR.FILENOTFOUND);
+//        }
+//        catch(UnsupportedAudioFileException e) {
+//            return OZMod.proceedError(OZMod.ERR.INVALIDFORMAT);
+//        }
+//
+//        file_ = _file;
+//
+//        try {
+////            clip_ = AudioSystem.getClip(OZMod.usedMixer_.getMixerInfo());
+//            clip_.open(stream);
+//        }
+//        catch(LineUnavailableException e) {
+//            return OZMod.proceedError(OZMod.ERR.DEVICESATURATE);
+//        }
+//        catch(IOException e) {
+//            return OZMod.proceedError(OZMod.ERR.DEVICESATURATE);
+//        }
+//
+//        AudioFormat format = stream.getFormat();
+//        nbChannels_ = format.getChannels();
+//        frequency_ = (int) format.getSampleRate();
+//        nbBits_ = format.getSampleSizeInBits();
+//        formatDesc_ = format.toString();
+//
+//        return OZMod.proceedError(OZMod.ERR.NOERR);
+//    }
 
     /**
      * Gets the number of channel(s) of the sound. 
@@ -149,7 +149,7 @@ public class Sound {
     public Sound duplicate()
     {
         Sound sound = new Sound();
-        sound.load(file_);
+//        sound.load(file_);
         return sound;
     }
 

@@ -21,10 +21,11 @@ Contact the author: igor@tsarevitch.org
 
 package ozmod;
 
-import javax.sound.sampled.*;
+import java.io.File;
 
-import java.io.*;
-import java.net.*;
+//import javax.sound.sampled.AudioSystem;
+//import javax.sound.sampled.Line;
+//import javax.sound.sampled.Mixer;
 
 /**
  * The OZMod kernel where output device are managed.
@@ -53,39 +54,39 @@ public class OZMod {
         int i, k;
         int len;
 
-        Mixer.Info mixerInfo[] = AudioSystem.getMixerInfo();
+//        Mixer.Info mixerInfo[] = AudioSystem.getMixerInfo();
 
         // Build OutputDevice
 
-        len = mixerInfo.length;
+//        len = mixerInfo.length;
 
         k = 0;
-        for (i = 0; i < len; i++) {
+//        for (i = 0; i < len; i++) {
 
-            Mixer mixer = AudioSystem.getMixer( mixerInfo[i] );
+//            Mixer mixer = AudioSystem.getMixer( mixerInfo[i] );
 
-            Line.Info infoLine[] = mixer.getSourceLineInfo();
+//            Line.Info infoLine[] = mixer.getSourceLineInfo();
 
-            if (infoLine.length == 0)
-                continue;
+//            if (infoLine.length == 0)
+//                continue;
 
-            k++;
-        }
+//            k++;
+//        }
 
-        outputMixer_ = new Mixer[k];
+//        outputMixer_ = new Mixer[k];
 
         k = 0;
-        for (i = 0; i < len; i++) {
+//        for (i = 0; i < len; i++) {
 
-            Mixer mixer = AudioSystem.getMixer( mixerInfo[i] );
+//            Mixer mixer = AudioSystem.getMixer( mixerInfo[i] );
 
-            Line.Info infoLine[] = mixer.getSourceLineInfo();
+//            Line.Info infoLine[] = mixer.getSourceLineInfo();
 
-            if (infoLine.length == 0)
-                continue;
+//            if (infoLine.length == 0)
+//                continue;
 
-            outputMixer_[k++] = mixer;
-        }
+//            outputMixer_[k++] = mixer;
+//        }
         
         lastError_ = ERR.NOERR;
     }
@@ -98,34 +99,34 @@ public class OZMod {
      * Gets the number of output device
      * @return The number of output device.
      */
-    public int getNbOutput()
-    {
-        return outputMixer_.length;
-    }
+//    public int getNbOutput()
+//    {
+//        return outputMixer_.length;
+//    }
     
     /**
      * Gets the name of an output device.
      * @param _i The zero indexed output device.
      * @return The name of the device.
      */
-    public String getOutputName(int _i)
-    {
-        Mixer.Info info;
-        info = outputMixer_[_i].getMixerInfo();
-        return info.getName();
-    }
+//    public String getOutputName(int _i)
+//    {
+//        Mixer.Info info;
+//        info = outputMixer_[_i].getMixerInfo();
+//        return info.getName();
+//    }
 
     /**
      * Gets the description of an output device.
      * @param _i The zero indexed output device.
      * @return The description of the device.
      */
-    public String getOutputDescription(int _i)
-    {
-        Mixer.Info info;
-        info = outputMixer_[_i].getMixerInfo();
-        return info.getDescription();
-    }
+//    public String getOutputDescription(int _i)
+//    {
+//        Mixer.Info info;
+//        info = outputMixer_[_i].getMixerInfo();
+//        return info.getDescription();
+//    }
 
     /**
      * Initializes the standard output device.
@@ -147,7 +148,7 @@ public class OZMod {
 
         initialised_ = true;
 
-        usedMixer_ = outputMixer_[_deviceIndex];
+//        usedMixer_ = outputMixer_[_deviceIndex];
 
         return proceedError(ERR.NOERR);
     }
@@ -160,7 +161,7 @@ public class OZMod {
     public Sound getClipSound(File _file)
     {
         Sound sound = new Sound();
-        sound.load(_file);
+//        sound.load(_file);
         if (sound.getClip() == null)
             return null;
         return sound;
@@ -196,8 +197,8 @@ public class OZMod {
     boolean initialised_ = false;
     static ERR lastError_;
 
-    Mixer outputMixer_[];
-    public static Mixer usedMixer_;
+//    Mixer outputMixer_[];
+//    public static Mixer usedMixer_;
     
     static int g_squareTable[] = {
             255, 255, 255, 255, 255, 255, 255, 255,
