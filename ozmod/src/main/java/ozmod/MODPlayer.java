@@ -834,12 +834,15 @@ public class MODPlayer extends Thread {
 		gdxAudio.writeSamples(pcms_, 0, nbsamp * 2);
 	}
 
+	private static final String TAG = "MODPlayer";
 	/**
 	 * Never call this method directly. Use play() instead.
 	 */
 	public void run() {
 		freq_ = 44100;
+		Gdx.app.log(TAG, "Gdx.audio.newAudioDevice");
 		gdxAudio = Gdx.audio.newAudioDevice(freq_, false);
+		Gdx.app.log(TAG, "setVolume");
 		gdxAudio.setVolume(.9f);
 
 		int soundBufferLen = freq_ * 4;
@@ -848,6 +851,7 @@ public class MODPlayer extends Thread {
 
 		long cumulTime = 0;
 
+		Gdx.app.log(TAG, "while: running_");
 		while (running_) {
 			// if (prevMasterVolume != masterVolume) {
 			// prevMasterVolume = masterVolume;
@@ -874,6 +878,7 @@ public class MODPlayer extends Thread {
 			}
 			doSleep((intTimerRate - cumulTime) / 2);
 		}
+		Gdx.app.log(TAG, "done");
 		done();
 		done_ = true;
 	}
