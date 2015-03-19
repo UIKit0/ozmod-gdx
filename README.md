@@ -9,6 +9,10 @@ All of your MOD should be replayed without any difficulties with a very low CPU 
 
 http://www.tsarevitch.org/ozmod/.
 
-## YOU MUST INCREASE YOUR AUDIO BUFFER SIZE !!!
+### Does not work for iOS (no audio device to hook into)
+
+### Does not work for HTML (no audio device to hook info)
+
+#### DESKTOP USERS: YOU MUST INCREASE YOUR AUDIO BUFFER SIZE !!!
 
 config.audioDeviceBufferSize=16384;
