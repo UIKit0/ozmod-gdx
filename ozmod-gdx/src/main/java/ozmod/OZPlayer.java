@@ -5,7 +5,7 @@ import ozmod.OZModPlayer.IAudioDevice;
 import ozmod.SeekableBytes.Endian;
 
 public class OZPlayer {
-	private static final int SCRM_SKIP = 44;
+	private static final int SCRM_MARK_START = 44;
 	public static enum ModType {
 		IT, MOD, S3M, XM;
 	}
@@ -16,15 +16,15 @@ public class OZPlayer {
 			byte byteArray4[] = new byte[4];
 			buffer_le.seek(0);
 			buffer_le.read(byteArray4, 0, 4);
-			String format = new String(byteArray4).substring(0, 4);
+			String format = new String(byteArray4);
 			if (format.equals("IMPM")) {
 				type=ModType.IT;
 				break identify;
 			}
-			buffer_le.seek(0);
-			buffer_le.forward(SCRM_SKIP);
+			buffer_le.seek(SCRM_MARK_START);
 			buffer_le.read(byteArray4, 0, 4);
-			format = new String(byteArray4).substring(0, 4);
+			format = new String(byteArray4);
+			System.out.println("Format: '"+format+"'");
 			if (format.equals("SCRM")) {
 				type=ModType.S3M;
 				break identify;
@@ -55,7 +55,7 @@ public class OZPlayer {
 		case S3M:
 			S3MPlayer s3mPlayer = new S3MPlayer(pcmAudio);
 			s3mPlayer.load(bytes);
-			break;
+			return s3mPlayer;
 		case XM:
 			XMPlayer xmPlayer = new XMPlayer(pcmAudio);
 			xmPlayer.load(bytes);
