@@ -31,6 +31,8 @@ public abstract class OZModPlayer extends Thread {
 		TAG=this.getClass().getSimpleName();
 		gdxAudio = audioDevice;
 		timer_=new Timer();
+		setDaemon(true);
+		setPriority(MIN_PRIORITY);
 	}
 	
 	protected abstract void dispatchNotes();
