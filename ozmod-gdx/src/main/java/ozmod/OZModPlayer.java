@@ -4,13 +4,10 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
-import ozmod.SeekableBytes.Endian;
-
 public abstract class OZModPlayer extends Thread {
 	
 	public static interface IAudioDevice {
-		void setVolume(float f);
-		void writeSamples(short[] pcms_, int i, int j);
+		void writeSamples(short[] samples, int offset, int numSamples);
 	};
 	
 	protected ChannelsList chansList_ = new ChannelsList();

@@ -1176,7 +1176,6 @@ public class S3MPlayer extends OZModPlayer {
 	@Override
 	public void run() {
 		frequency_ = 44100;
-		gdxAudio.setVolume(1f);
 
 		int soundBufferLen = frequency_ * 4;
 		pcm_ = new byte[soundBufferLen];
