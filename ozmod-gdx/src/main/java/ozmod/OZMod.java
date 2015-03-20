@@ -23,10 +23,6 @@ package ozmod;
 
 import java.io.File;
 
-//import javax.sound.sampled.AudioSystem;
-//import javax.sound.sampled.Line;
-//import javax.sound.sampled.Mixer;
-
 /**
  * The OZMod kernel where output device are managed.
  * @author tsar
@@ -153,20 +149,6 @@ public class OZMod {
         return proceedError(ERR.NOERR);
     }
     
-    /**
-     * Gets a clips sound. The sound can be in WAV format, AIFF or AU.
-     * @param _file The disk file of the sound.
-     * @return The Sound instance or null if an error occured. If an error occured use getLastError() to determine the error.
-     */
-    public Sound getClipSound(File _file)
-    {
-        Sound sound = new Sound();
-//        sound.load(_file);
-        if (sound.getClip() == null)
-            return null;
-        return sound;
-    }
-
     /**
      * Swap the low and high bytes of a word.
      * @param _value The word to swap the bytes.
