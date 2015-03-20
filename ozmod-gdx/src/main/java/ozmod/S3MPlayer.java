@@ -867,37 +867,37 @@ public class S3MPlayer extends OZModPlayer {
 	@Override
 	public void load(byte[] bytes) {
 
-		SeekableBytes _input = new SeekableBytes(bytes, Endian.LITTLEENDIAN);
+		SeekableBytes buffer = new SeekableBytes(bytes, Endian.LITTLEENDIAN);
 
 		byte tmp[] = new byte[4];
 
-		_input.readFully(songName_);
-		ID_ = _input.readByte();
-		fileType_ = _input.readByte();
-		_input.forward(2);
+		buffer.readFully(songName_);
+		ID_ = buffer.readByte();
+		fileType_ = buffer.readByte();
+		buffer.forward(2);
 
-		listLen_ = _input.readUShort();
-		nbInstrus_ = _input.readUShort();
-		nbPatterns_ = _input.readUShort();
-		fileFlags_ = _input.readUShort();
-		_input.forward(2); // version info
-		_input.forward(2); // format version
-		_input.read(tmp, 0, 4);
+		listLen_ = buffer.readUShort();
+		nbInstrus_ = buffer.readUShort();
+		nbPatterns_ = buffer.readUShort();
+		fileFlags_ = buffer.readUShort();
+		buffer.forward(2); // version info
+		buffer.forward(2); // format version
+		buffer.read(tmp, 0, 4);
 		String format = new String(tmp).substring(0, 4);
 		if (format.compareTo("SCRM") != 0)
 			throw new OZModRuntimeError(OZMod.ERR.BADFORMAT);
 
 		int initialPanID;
 
-		volumeMaster_ = _input.readUByte();
-		startSpeed_ = _input.readUByte();
-		startTempo_ = _input.readUByte();
-		masterMultiplier_ = _input.readUByte();
-		_input.forward(1);
-		initialPanID = _input.readUByte();
-		_input.forward(10);
+		volumeMaster_ = buffer.readUByte();
+		startSpeed_ = buffer.readUByte();
+		startTempo_ = buffer.readUByte();
+		masterMultiplier_ = buffer.readUByte();
+		buffer.forward(1);
+		initialPanID = buffer.readUByte();
+		buffer.forward(10);
 		for (int i = 0; i < 32; i++)
-			specChannel_[i] = _input.readUByte();
+			specChannel_[i] = buffer.readUByte();
 
 		for (int i = 0; i < MAX_NB_CHANNELS; i++)
 			chanRemap_[i] = 255;
@@ -914,47 +914,47 @@ public class S3MPlayer extends OZModPlayer {
 
 		numListPattern_ = new int[listLen_];
 		for (int i = 0; i < listLen_; i++) {
-			int num = _input.readUByte();
+			int num = buffer.readUByte();
 			numListPattern_[i] = num;
 		}
 
 		// Read instru and related info
 		instrus_ = new Instru[nbInstrus_];
-		int actuFilePos = _input.tell();
+		int actuFilePos = buffer.tell();
 		for (int numInstru = 0; numInstru < nbInstrus_; numInstru++) {
 			Instru instru = new Instru();
 			instrus_[numInstru] = instru;
 
 			int offsetInstru;
-			_input.seek(actuFilePos);
+			buffer.seek(actuFilePos);
 			actuFilePos += 2;
-			offsetInstru = _input.readUShort();
+			offsetInstru = buffer.readUShort();
 			offsetInstru <<= 4;
-			_input.seek(offsetInstru);
+			buffer.seek(offsetInstru);
 
-			instru.type = _input.readUByte();
-			_input.readFully(instru.DOSname);
+			instru.type = buffer.readUByte();
+			buffer.readFully(instru.DOSname);
 			byte doff[] = new byte[3];
-			_input.read(doff, 0, 3);
+			buffer.read(doff, 0, 3);
 			int b1 = doff[0];
 			int b2 = (doff[1] & 0xff) << 8;
 			int b3 = (doff[2] & 0xff) << 16;
 			instru.sampleDataOffset = b1 | b2 | b3;
-			instru.sampleDataLen = _input.readInt();
-			instru.startLoop = _input.readInt();
-			instru.endLoop = _input.readInt();
-			instru.defaultVolume = _input.readUByte();
-			instru.disk = _input.readUByte();
-			instru.packType = _input.readUByte();
-			instru.flags = _input.readUByte();
-			instru.C2Speed = _input.readInt();
-			_input.forward(4); // non-used
-			_input.forward(2); // gravis memory position
-			_input.forward(6); // used for ?
-			_input.readFully(instru.instruName);
+			instru.sampleDataLen = buffer.readInt();
+			instru.startLoop = buffer.readInt();
+			instru.endLoop = buffer.readInt();
+			instru.defaultVolume = buffer.readUByte();
+			instru.disk = buffer.readUByte();
+			instru.packType = buffer.readUByte();
+			instru.flags = buffer.readUByte();
+			instru.C2Speed = buffer.readInt();
+			buffer.forward(4); // non-used
+			buffer.forward(2); // gravis memory position
+			buffer.forward(6); // used for ?
+			buffer.readFully(instru.instruName);
 
 			int strID;
-			strID = _input.readInt();
+			strID = buffer.readInt();
 
 			int sizeForSample = instru.sampleDataLen;
 			if (sizeForSample == 0)
@@ -976,10 +976,10 @@ public class S3MPlayer extends OZModPlayer {
 			int endLoop = instru.endLoop;
 
 			int off = instru.sampleDataOffset >> 4;
-			_input.seek(off);
+			buffer.seek(off);
 
 			byte pcm[] = new byte[sizeForSample];
-			_input.readFully(pcm);
+			buffer.readFully(pcm);
 
 			if (nbBits == 8) {
 				for (int i = 0; i < sizeForSample; i++)
@@ -1042,12 +1042,12 @@ public class S3MPlayer extends OZModPlayer {
 			patterns_[numPattern] = pattern;
 
 			int offsetPattern = 0;
-			_input.seek(actuFilePos);
+			buffer.seek(actuFilePos);
 			actuFilePos += 2;
 
-			offsetPattern = _input.readUShort();
+			offsetPattern = buffer.readUShort();
 			offsetPattern <<= 4;
-			_input.seek(offsetPattern + 2);
+			buffer.seek(offsetPattern + 2);
 
 			Note bidonNote = new Note();
 			Note actuNote;
@@ -1062,7 +1062,7 @@ public class S3MPlayer extends OZModPlayer {
 
 				while (true) {
 					int byt = 0;
-					byt = _input.readUByte();
+					byt = buffer.readUByte();
 					if (byt == 0)
 						break;
 
@@ -1076,19 +1076,19 @@ public class S3MPlayer extends OZModPlayer {
 
 					if ((byt & 32) != 0) {
 						int note;
-						note = _input.readUByte();
-						actuNote.numInstru = _input.readUByte();
+						note = buffer.readUByte();
+						actuNote.numInstru = buffer.readUByte();
 						actuNote.note = ((note >> 4) * 12) + (note & 0xf);
 					}
 
 					if ((byt & 64) != 0) {
-						actuNote.vol = _input.readUByte();
+						actuNote.vol = buffer.readUByte();
 						actuNote.vol++;
 					}
 
 					if ((byt & 128) != 0) {
-						actuNote.command = _input.readUByte();
-						actuNote.commandParam = _input.readUByte();
+						actuNote.command = buffer.readUByte();
+						actuNote.commandParam = buffer.readUByte();
 					}
 				}
 				numRow++;
@@ -1108,9 +1108,9 @@ public class S3MPlayer extends OZModPlayer {
 		}
 
 		if (initialPanID == 252) {
-			_input.seek(actuFilePos);
+			buffer.seek(actuFilePos);
 			for (int i = 0; i < 32; i++)
-				panChannel_[i] = _input.readUByte();
+				panChannel_[i] = buffer.readUByte();
 
 			int j = 0;
 			for (int i = 0; i < 32; i++) {
