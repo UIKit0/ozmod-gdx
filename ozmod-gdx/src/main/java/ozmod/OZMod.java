@@ -21,7 +21,6 @@ Contact the author: igor@tsarevitch.org
 
 package ozmod;
 
-import java.io.File;
 
 /**
  * The OZMod kernel where output device are managed.
