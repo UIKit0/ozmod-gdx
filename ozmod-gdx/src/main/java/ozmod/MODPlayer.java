@@ -940,9 +940,9 @@ public class MODPlayer extends OZModPlayer {
 			int intTimerRate = (int) Math.floor(timerRate);
 
 			cumulTime += since;
-			while (cumulTime >= intTimerRate) {
+			if (cumulTime >= intTimerRate) {
 				cumulTime -= intTimerRate;
-				oneShot(intTimerRate);
+				oneShot(intTimerRate);				
 			}
 			doSleep((intTimerRate - cumulTime) / 2);
 			totalTime += since;

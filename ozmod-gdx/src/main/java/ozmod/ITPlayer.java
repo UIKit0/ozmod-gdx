@@ -2475,23 +2475,16 @@ public class ITPlayer extends OZModPlayer {
 		while (running_ == true) {
 			float timerRate = 1000.0f / (tempo_ * 0.4f);
 			int intTimerRate = (int) Math.floor(timerRate);
+			long since = timer_.getDelta();
 			if (paused) {
 				doSleep(100);
 				continue;
 			}
-			long since = timer_.getDelta();
 			cumulTime += since;
 
 			if (cumulTime >= intTimerRate) {
-
 				cumulTime -= intTimerRate;
-
 				oneShot(intTimerRate);
-
-				while (cumulTime >= intTimerRate) {
-					cumulTime -= intTimerRate;
-					oneShot(intTimerRate);
-				}
 				doSleep((intTimerRate - cumulTime) / 2);
 				totalTime += since;
 				if (maxPlayTime>0 && totalTime>maxPlayTime) {
