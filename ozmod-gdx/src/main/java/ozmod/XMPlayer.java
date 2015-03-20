@@ -1569,11 +1569,14 @@ public class XMPlayer extends OZModPlayer {
 		long cumulTime = 0;
 
 		while (running_) {
-			long since = timer_.getDelta();
 			
 			float timerRate = 1000.0f / (BPM_ * 0.4f);
 			int intTimerRate = (int) Math.floor(timerRate);
-			
+			if (paused) {
+				doSleep(100);
+				continue;
+			}			
+			long since = timer_.getDelta();
 			cumulTime += since;
 
 			while (cumulTime >= intTimerRate) {

@@ -23,6 +23,7 @@ public abstract class OZModPlayer extends Thread {
 	protected final String TAG;
 	protected int tick_;
 	protected final Timer timer_;
+	protected boolean paused;
 	/**
 	 * Provide Interface To Audio device. Must accept 44.1KHz stereo audio!
 	 * @param audioDevice
@@ -98,5 +99,9 @@ public abstract class OZModPlayer extends Thread {
 
 	public void setLoopable(boolean loopable) {
 		loopable_=loopable;		
+	}
+
+	public void pause(boolean b) {
+		paused=b;
 	}
 }

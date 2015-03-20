@@ -932,10 +932,10 @@ public class MODPlayer extends OZModPlayer {
 			// gdxAudio.setVolume(masterVolume);
 			// }
 			long since = timer_.getDelta();
-			// if (paused) {
-			// doSleep(100);
-			// continue;
-			// }
+			if (paused) {
+				doSleep(100);
+				continue;
+			}
 			// totalTime += since;
 			// max ten minutes for any one song
 			// if (totalTime > maxPlayTime && !loopable_) {

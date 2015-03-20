@@ -1187,7 +1187,10 @@ public class S3MPlayer extends OZModPlayer {
 
 			float timerRate = 1000.0f / (tempo_ * 0.4f);
 			int intTimerRate = (int) Math.floor(timerRate);
-
+			if (paused) {
+				doSleep(100);
+				continue;
+			}
 			long since = timer_.getDelta();
 			cumulTime += since;
 
