@@ -24,7 +24,6 @@ public class OZPlayer {
 			buffer_le.seek(SCRM_MARK_START);
 			buffer_le.read(byteArray4, 0, 4);
 			format = new String(byteArray4);
-			System.out.println("Format: '"+format+"'");
 			if (format.equals("SCRM")) {
 				type=ModType.S3M;
 				break identify;
