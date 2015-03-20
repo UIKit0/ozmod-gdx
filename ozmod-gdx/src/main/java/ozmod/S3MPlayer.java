@@ -1181,8 +1181,6 @@ public class S3MPlayer extends OZModPlayer {
 		pcms_ = new short[pcm_.length / 2];
 
 		long cumulTime = 0;
-		long startTime = timer_.getElapsed();
-
 		while (running_) {
 
 			float timerRate = 1000.0f / (tempo_ * 0.4f);
@@ -1199,7 +1197,10 @@ public class S3MPlayer extends OZModPlayer {
 				oneShot(intTimerRate);
 			}
 			doSleep((intTimerRate - cumulTime) / 2);
-
+			totalTime += since;
+			if (maxPlayTime>0 && totalTime>maxPlayTime) {
+				done();
+			}
 		}
 		done();
 	}

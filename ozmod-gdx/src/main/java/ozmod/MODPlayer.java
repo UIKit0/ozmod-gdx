@@ -920,7 +920,7 @@ public class MODPlayer extends OZModPlayer {
 		pcms_ = new short[pcm_.length / 2];
 
 		long cumulTime = 0;
-
+		
 		while (running_) {
 			// if (prevMasterVolume != masterVolume) {
 			// prevMasterVolume = masterVolume;
@@ -940,13 +940,17 @@ public class MODPlayer extends OZModPlayer {
 			int intTimerRate = (int) Math.floor(timerRate);
 
 			cumulTime += since;
-
 			while (cumulTime >= intTimerRate) {
 				cumulTime -= intTimerRate;
 				oneShot(intTimerRate);
 			}
 			doSleep((intTimerRate - cumulTime) / 2);
+			totalTime += since;
+			if (maxPlayTime>0 && totalTime>maxPlayTime) {
+				done();
+			}
 		}
+		System.out.println("MODPlayer: DONE");
 		done();
 	}
 

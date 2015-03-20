@@ -2493,6 +2493,10 @@ public class ITPlayer extends OZModPlayer {
 					oneShot(intTimerRate);
 				}
 				doSleep((intTimerRate - cumulTime) / 2);
+				totalTime += since;
+				if (maxPlayTime>0 && totalTime>maxPlayTime) {
+					done();
+				}
 			}
 		}
 		done();

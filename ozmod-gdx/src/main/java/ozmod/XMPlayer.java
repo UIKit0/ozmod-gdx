@@ -728,7 +728,10 @@ public class XMPlayer extends OZModPlayer {
 					bAllowToUpdateNote = false;
 			}
 
-			if (iInstru >= 0) {
+			/*
+			 * Added iInstru<instrus_.length to prevent array bounds error
+			 */
+			if (iInstru >= 0 && iInstru<instrus_.length) {
 				// if (iInstru > nbInstrus_)
 				// voice.actuInstru_ = NULLInstru_;
 				// else
@@ -1579,6 +1582,10 @@ public class XMPlayer extends OZModPlayer {
 				oneShot(intTimerRate);
 			}
 			doSleep((intTimerRate - cumulTime)-100);
+			totalTime += since;
+			if (maxPlayTime>0 && totalTime>maxPlayTime) {
+				done();
+			}
 		}
 		done();
 	}

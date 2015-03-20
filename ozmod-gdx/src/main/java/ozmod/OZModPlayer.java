@@ -46,12 +46,13 @@ public abstract class OZModPlayer extends Thread {
 	 * Stops playing and calls "doWhenDone" runnables.
 	 */
 	public void done() {
+		System.out.println("OZModPlayer: DONE");
 		running_ = false;
+		doWhenDone();
 		try {
 			join();
 		} catch (InterruptedException e) {
 		}		
-		doWhenDone();
 	}
 
 	private void doWhenDone() {
@@ -75,6 +76,7 @@ public abstract class OZModPlayer extends Thread {
 	}
 
 	private Set<Runnable> whenDone = new HashSet<Runnable>();
+	protected long maxPlayTime;
 
 	public void addWhenDone(Runnable whenDone) {
 		this.whenDone.add(whenDone);
@@ -178,4 +180,12 @@ public abstract class OZModPlayer extends Thread {
 	public abstract void setVolume(float _vol);
 
 	public abstract float getVolume();
+	
+	protected long totalTime=0;
+	public void setMaxPlayTime(long ms) {
+		this.maxPlayTime=ms;
+	}
+	public long getMaxPlayTime() {
+		return maxPlayTime;
+	}
 }
