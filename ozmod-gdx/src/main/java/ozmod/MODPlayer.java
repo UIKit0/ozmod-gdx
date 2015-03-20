@@ -21,6 +21,9 @@ Contact the author: igor@tsarevitch.org
 
 package ozmod;
 
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
+
 import ozmod.SeekableBytes.Endian;
 
 /**
@@ -350,6 +353,10 @@ public class MODPlayer extends OZModPlayer {
 		super(audioDevice);
 	}
 
+	@Override
+	public String getSongName() {
+		return new String(songName_, Charset.forName("UTF-8"));
+	}
 	@Override
 	protected void dispatchNotes() {
 		int iInstru;

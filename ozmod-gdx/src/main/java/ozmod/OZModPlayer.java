@@ -188,4 +188,6 @@ public abstract class OZModPlayer extends Thread {
 	public long getMaxPlayTime() {
 		return maxPlayTime;
 	}
+
+	public abstract String getSongName();
 }

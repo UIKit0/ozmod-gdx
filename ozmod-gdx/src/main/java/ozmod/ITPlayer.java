@@ -886,7 +886,7 @@ public class ITPlayer extends OZModPlayer {
 	protected int nbSamples_;
 	protected int nbVCs_ = 0;
 	protected Instru nullInstru_;
-	int offsrcpos = 0;
+	protected int offsrcpos = 0;
 	protected int orders_[];
 	protected int panSeparation_;
 	protected Pattern patterns_[];
@@ -896,12 +896,17 @@ public class ITPlayer extends OZModPlayer {
 	protected int songPos_;
 	protected int songRow_;
 	protected int speed_;
-	int srcbuffer[];
-	int srcpos[];
-	int srcrembits;
+	protected int srcbuffer[];
+	protected int srcpos[];
+	protected int srcrembits;
 	protected int tempo_;
 	protected Voice voices_[] = new Voice[128];
 	protected float vol_; // localVol unaffected by GAudio's global volume
+	
+	@Override
+	public String getSongName(){
+		return songName_;
+	}
 
 	public ITPlayer(IAudioDevice audioDevice) {
 		super(audioDevice);

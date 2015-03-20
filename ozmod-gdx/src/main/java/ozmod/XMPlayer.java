@@ -21,6 +21,8 @@ Contact the author: igor@tsarevitch.org
 
 package ozmod;
 
+import java.nio.charset.Charset;
+
 import ozmod.SeekableBytes.Endian;
 
 /**
@@ -666,6 +668,10 @@ public class XMPlayer extends OZModPlayer {
 	protected byte trackerName_[] = new byte[20];
 	protected int version_;
 	protected Voice voices_[];
+	@Override
+	public String getSongName() {
+		return new String(songName_, Charset.forName("UTF-8"));
+	}
 	public XMPlayer(IAudioDevice audioDevice) {
 		super(audioDevice);
 		speed_ = 6;

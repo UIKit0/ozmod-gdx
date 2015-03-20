@@ -23,6 +23,7 @@ package ozmod;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.Charset;
 import java.util.Arrays;
 
 import ozmod.SeekableBytes.Endian;
@@ -395,6 +396,11 @@ public class S3MPlayer extends OZModPlayer {
 		super(audioDevice);
 	}
 
+	@Override
+	public String getSongName() {
+		return new String(songName_, Charset.forName("UTF-8"));
+	}
+	
 	protected void dispatchNotes() {
 		int note, numInstru, volume, command, commandParam;
 		int actuCommandParam;
