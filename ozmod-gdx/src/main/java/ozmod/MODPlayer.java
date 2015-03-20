@@ -21,105 +21,112 @@ Contact the author: igor@tsarevitch.org
 
 package ozmod;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.util.Arrays;
-
-import ozmod.OZMod.ERR;
-
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.audio.AudioDevice;
+import ozmod.SeekableBytes.Endian;
 
 /**
  * A Class to replay MOD file.
  */
-public class MODPlayer extends Thread {
+public class MODPlayer extends OZModPlayer {
 
-	final static int MOD_MIN_PERIOD = 40;
-	final static int MOD_MAX_PERIOD = 11520;
+	protected static class Instru {
 
-	int period_[] = { 1712, 1616, 1524, 1440, 1356, 1280, 1208, 1140, 1076,
-			1016, 960, 907 };
+		AudioData audio = new AudioData();
 
-	class Instru {
+		int finetune;
+		int len;
+		int lengthLoop;
+		byte name[] = new byte[22];
+		int startLoop;
+		int vol;
 
 		Instru() {
 		}
+	}
 
-		byte name[] = new byte[22];
-		int finetune;
-		int vol;
-		int startLoop;
-		int lengthLoop;
-		int len;
-		AudioData audio = new AudioData();
-	};
+	protected static class Note {
 
-	class Note {
+		int effect;
+
+		int effectOperand;
+		int note;
+		int numInstru;
 
 		Note() {
 		}
+	}
 
-		int note;
-		int effect;
-		int effectOperand;
-		int numInstru;
-	};
+	protected static class Pattern {
 
-	class Row {
-		Row() {
-		}
-
-		Note notes[];
-	};
-
-	class Pattern {
+		Row rows[] = new Row[64];
 
 		Pattern() {
 		}
-
-		Row rows[] = new Row[64];
 	}
 
-	class Voice {
+	protected static class Row {
+		Note notes[];
 
-		void vibrato() {
-			int vibSeek;
-			int periodOffset;
-
-			vibSeek = (vibratoCounter_ >> 2) & 0x3f;
-
-			switch (vibratoForm_) {
-			default:
-				periodOffset = TrackerConstant.vibratoTable[vibSeek];
-				break;
-			}
-
-			periodOffset *= vibratoProf_;
-			periodOffset >>= 7;
-			periodOffset <<= 2;
-			period_ = periodBAK_ + periodOffset;
-			vibratoCounter_ += vibratoSpeed_;
+		Row() {
 		}
+	}
 
-		void tremolo() {
-			int tremoloSeek;
-			int volumeOffset;
+	protected class Voice {
 
-			tremoloSeek = (tremoloCounter_ >> 2) & 0x3f;
+		int arpeggioCount_ = 0, arp1_ = 0, arp2_ = 0;
 
-			switch (tremoloForm_) {
-			default:
-				volumeOffset = TrackerConstant.vibratoTable[tremoloSeek];
-				break;
-			}
+		boolean bFineVibrato_ = false;
 
-			volumeOffset *= tremoloProf_;
-			volumeOffset >>= 6;
-			volume_ = volumeBAK_ + volumeOffset;
+		boolean bGotArpeggio_ = false;
 
-			tremoloCounter_ += tremoloSpeed_;
-		}
+		boolean bGotNoteCut_ = false;
+
+		boolean bGotRetrigNote_ = false;
+
+		boolean bGotTremolo_ = false;
+		boolean bGotTremor_;
+
+		boolean bGotVibrato_ = false;
+
+		boolean bNeedToBePlayed_ = false;
+		boolean bNeedToStopSamplePlaying_ = false;
+		boolean bNoteCutted_ = false;
+		Channel channel_ = new Channel();
+		int fineTune_ = 0;
+		Instru instruPlaying_ = null;
+
+		Instru instruToPlay_ = null;
+		int iVoice_;
+		int lastDCommandParam_ = 0;
+
+		int lastECommandParam_ = 0;
+
+		int lastFCommandParam_ = 0;
+
+		int note_ = 0, effect_ = 0xfff, effectOperand_ = 0;
+
+		int noteCutDelay_;
+
+		int period_ = 0, dstPeriod_ = 0, periodBAK_ = 0;
+		int portamentoSpeed_ = 0;
+		int portaUp_ = 0, portaDown_ = 0;
+
+		int samplePosJump_;
+		int tickBeforeSample_;
+		int tickForRetrigNote_;
+		int tremoloCounter_ = 0;
+		int tremoloForm_ = 0;
+
+		int tremoloSpeed_ = 0, tremoloProf_ = 0;
+		int tremorCounter_;
+		int tremorValue_;
+		int vibratoCounter_ = 0;
+
+		int vibratoForm_ = 0;
+		int vibratoSpeed_ = 0, vibratoProf_ = 0;
+		int volFadeOutForRetrig_;
+
+		int volume_ = 0, volumeBAK_ = 0;
+		int volumeSlidingSpeed_ = 0;
 
 		void portamentoToNote(int _speed) {
 			if (period_ < dstPeriod_) {
@@ -175,7 +182,7 @@ public class MODPlayer extends Thread {
 
 			if (bNeedToBePlayed_ == false) {
 				channel_.frequency = freq;
-				channel_.step = freq / (float) (freq_);
+				channel_.step = freq / (float) (frequency_);
 				channel_.vol = vol;
 				channel_.setPan(pan);
 				return;
@@ -188,20 +195,39 @@ public class MODPlayer extends Thread {
 			} else
 				startPos = 0;
 
-			chans_.removeChannel(channel_);
+			chansList_.removeChannel(channel_);
 
 			if (tick_ >= tickBeforeSample_) {
 				channel_.frequency = freq;
-				channel_.step = freq / (float) (freq_);
+				channel_.step = freq / (float) (frequency_);
 				channel_.pos = startPos;
 				channel_.vol = vol;
 				channel_.setPan(pan);
 				channel_.audio = instruPlaying_.audio;
-				chans_.addChannel(channel_);
+				chansList_.addChannel(channel_);
 
 				bNeedToBePlayed_ = false;
 				tickBeforeSample_ = 0;
 			}
+		}
+
+		void tremolo() {
+			int tremoloSeek;
+			int volumeOffset;
+
+			tremoloSeek = (tremoloCounter_ >> 2) & 0x3f;
+
+			switch (tremoloForm_) {
+			default:
+				volumeOffset = TrackerConstant.vibratoTable[tremoloSeek];
+				break;
+			}
+
+			volumeOffset *= tremoloProf_;
+			volumeOffset >>= 6;
+			volume_ = volumeBAK_ + volumeOffset;
+
+			tremoloCounter_ += tremoloSpeed_;
 		}
 
 		void updateSoundWithEffect() {
@@ -279,215 +305,53 @@ public class MODPlayer extends Thread {
 			}
 		}
 
-		Instru instruPlaying_ = null;
-		Instru instruToPlay_ = null;
+		void vibrato() {
+			int vibSeek;
+			int periodOffset;
 
-		Channel channel_ = new Channel();
+			vibSeek = (vibratoCounter_ >> 2) & 0x3f;
 
-		int iVoice_;
-		int period_ = 0, dstPeriod_ = 0, periodBAK_ = 0;
-		int arpeggioCount_ = 0, arp1_ = 0, arp2_ = 0;
-		int note_ = 0, effect_ = 0xfff, effectOperand_ = 0;
-		boolean bNeedToStopSamplePlaying_ = false;
-		boolean bNeedToBePlayed_ = false;
-
-		int lastDCommandParam_ = 0;
-		int lastECommandParam_ = 0;
-		int lastFCommandParam_ = 0;
-
-		int volumeSlidingSpeed_ = 0;
-
-		int portamentoSpeed_ = 0;
-
-		boolean bGotArpeggio_ = false;
-
-		int portaUp_ = 0, portaDown_ = 0;
-
-		int tremorValue_;
-		int tremorCounter_;
-		boolean bGotTremor_;
-
-		boolean bGotVibrato_ = false;
-		int vibratoCounter_ = 0;
-		int vibratoForm_ = 0;
-		int vibratoSpeed_ = 0, vibratoProf_ = 0;
-		boolean bFineVibrato_ = false;
-
-		boolean bGotTremolo_ = false;
-		int tremoloCounter_ = 0;
-		int tremoloForm_ = 0;
-		int tremoloSpeed_ = 0, tremoloProf_ = 0;
-
-		boolean bGotNoteCut_ = false;
-		int noteCutDelay_;
-		boolean bNoteCutted_ = false;
-
-		int fineTune_ = 0;
-		int volume_ = 0, volumeBAK_ = 0;
-
-		int tickBeforeSample_;
-		int samplePosJump_;
-
-		boolean bGotRetrigNote_ = false;
-		int tickForRetrigNote_;
-		int volFadeOutForRetrig_;
-	}
-
-	public MODPlayer() {
-	}
-
-	protected void finalize() {
-		running_ = false;
-	}
-
-	/**
-	 * Loads the MOD.
-	 * 
-	 * @param _input
-	 *            An instance to a PipeIn Class to read data from disk or URL.
-	 * @return NOERR if no error occured.
-	 */
-	public OZMod.ERR load(PipeIn _input) {
-		OZMod.ERR err;
-		byte tmp[] = new byte[20];
-
-		err = _input.readContent();
-		if (err != ERR.NOERR)
-			return err;
-
-		// Normal MOD?
-		_input.seek(1080);
-		_input.read(tmp, 0, 4);
-		String format = new String(tmp).substring(0, 4);
-		if (format.compareTo("M.K.") == 0)
-			nbVoices_ = 4;
-		else if (format.compareTo("FLT4") == 0)
-			nbVoices_ = 4;
-		else if (format.compareTo("6CHN") == 0)
-			nbVoices_ = 6;
-		else if (format.compareTo("8CHN") == 0)
-			nbVoices_ = 6;
-		else if (format.compareTo("16CH") == 0)
-			nbVoices_ = 6;
-		else
-			return OZMod.proceedError(OZMod.ERR.BADFORMAT);
-
-		// Song name
-		_input.seek(0);
-		_input.read(songName_, 0, 20);
-
-		// 31 samples
-		nbInstrus_ = 31;
-		for (int i = 0; i < nbInstrus_; i++) {
-			Instru instru = new Instru();
-			instrus_[i] = instru;
-			_input.read(instru.name, 0, 22);
-
-			instru.len = _input.readUShort() * 2;
-			instru.finetune = ozmod.TrackerConstant.finetune[_input.readByte() & 0xf];
-			instru.vol = _input.readByte();
-			instru.startLoop = _input.readUShort() * 2;
-			instru.lengthLoop = _input.readUShort() * 2;
-			if (instru.lengthLoop < 4)
-				instru.lengthLoop = 0;
-		}
-		// end of header
-
-		_input.seek(950);
-		listLen_ = _input.readUByte();
-
-		_input.seek(952);
-		for (int i = 0; i < 128; i++) {
-			int pattern = _input.readUByte();
-			listPatterns_[i] = pattern;
-		}
-
-		// Calculate the number of patterns
-		nbPatterns_ = 0;
-		for (int i = 0; i < 128; i++) {
-			if (listPatterns_[i] > nbPatterns_)
-				nbPatterns_ = listPatterns_[i];
-		}
-		nbPatterns_++;
-		_input.seek(1084);
-
-		// Read patterns
-		patterns_ = new Pattern[nbPatterns_];
-		for (int i = 0; i < nbPatterns_; i++) {
-			Pattern pat = new Pattern();
-			patterns_[i] = pat;
-
-			for (int j = 0; j < 64; j++) {
-				pat.rows[j] = new Row();
-				pat.rows[j].notes = new Note[nbVoices_];
-				for (int k = 0; k < nbVoices_; k++) {
-					pat.rows[j].notes[k] = new Note();
-
-					int byte1, byte2, byte3, byte4;
-					byte1 = _input.readByte() & 0xff;
-					byte2 = _input.readByte() & 0xff;
-					byte3 = _input.readByte() & 0xff;
-					byte4 = _input.readByte() & 0xff;
-
-					int period = ((byte1 & 0xf) << 8) + byte2;
-					int l = 0;
-					for (l = 0; l < 60; l++) {
-						if (period >= ozmod.TrackerConstant.defaultPeriod[l])
-							break;
-					}
-
-					l++;
-					if (l == 61)
-						l = 0;
-
-					Note note;
-					note = pat.rows[j].notes[k];
-					note.note = l;
-					note.effect = byte3 & 0xf;
-					note.effectOperand = byte4;
-					note.numInstru = (((byte1 & 0xf0) + (byte3 >> 4)) & 0xff) - 1;
-				}
+			switch (vibratoForm_) {
+			default:
+				periodOffset = TrackerConstant.vibratoTable[vibSeek];
+				break;
 			}
+
+			periodOffset *= vibratoProf_;
+			periodOffset >>= 7;
+			periodOffset <<= 2;
+			period_ = periodBAK_ + periodOffset;
+			vibratoCounter_ += vibratoSpeed_;
 		}
-
-		// Sample read
-		_input.seek(1084 + nbPatterns_ * 256 * nbVoices_);
-
-		for (int i = 0; i < 31; i++) {
-			Instru instru = instrus_[i];
-			int len = instru.len;
-			if (len == 0)
-				continue;
-
-			byte pcm[] = new byte[len];
-			_input.readFully(pcm);
-
-			if (instru.lengthLoop == 0)
-				instru.audio.make(pcm, 8, 1);
-			else
-				instru.audio.make(pcm, 8, 1, instru.startLoop, instru.startLoop
-						+ instru.lengthLoop, AudioData.LOOP_FORWARD);
-		}
-
-		voices_ = new Voice[nbVoices_];
-		for (int i = 0; i < nbVoices_; i++) {
-			Voice voice = new Voice();
-			voices_[i] = voice;
-			voice.iVoice_ = i;
-		}
-
-		return OZMod.proceedError(OZMod.ERR.NOERR);
 	}
 
-	public void setVolume(float _vol) {
-		MODvolume_ = _vol;
+	protected final static int MOD_MAX_PERIOD = 11520;
+	protected final static int MOD_MIN_PERIOD = 40;
+	protected boolean bGotPatternLoop_ = false;
+	protected int BPM_;
+	protected Instru instrus_[] = new Instru[31];;
+	protected int listLen_;
+	protected int listPatterns_[] = new int[128];
+	protected float MODvolume_;
+	protected int nbInstrus_;
+	protected int nbPatterns_;
+	protected int nbVoices_;
+	protected float panPower_;
+	protected int patternDelay_;
+	protected int patternLoopLeft_ = 0;
+	protected int patternPosLoop_ = 0;
+	protected Pattern patterns_[];
+	protected int period_[] = { 1712, 1616, 1524, 1440, 1356, 1280, 1208, 1140,
+			1076, 1016, 960, 907 };
+	protected int posChanson_, posInPattern_;
+	protected byte songName_[] = new byte[20];
+	protected Voice voices_[];
+	public MODPlayer(IAudioDevice audioDevice) {
+		super(audioDevice);
 	}
 
-	public void setPanPower(float _p) {
-		panPower_ = _p;
-	}
-
-	void dispatchNotes() {
+	@Override
+	protected void dispatchNotes() {
 		int iInstru;
 		int note, effect, effectOperand, effectOperand2;
 
@@ -542,7 +406,7 @@ public class MODPlayer extends Thread {
 				if (iInstru <= nbInstrus_)
 					voice.instruToPlay_ = instrus_[iInstru];
 				else {
-					chans_.removeChannel(voice.channel_);
+					chansList_.removeChannel(voice.channel_);
 					voice.instruPlaying_ = null;
 					voice.instruToPlay_ = null;
 				}
@@ -825,138 +689,6 @@ public class MODPlayer extends Thread {
 		}
 	}
 
-	void mixSample(int _time) {
-		int nbsamp = freq_ / (1000 / _time);
-		Arrays.fill(pcm_, (byte) 0);
-		chans_.mix(nbsamp, pcm_);
-		ByteBuffer.wrap(pcm_).order(ByteOrder.BIG_ENDIAN).asShortBuffer()
-				.get(pcms_, 0, nbsamp * 2);
-		gdxAudio.writeSamples(pcms_, 0, nbsamp * 2);
-	}
-
-	private static final String TAG = "MODPlayer";
-	/**
-	 * Never call this method directly. Use play() instead.
-	 */
-	public void run() {
-		freq_ = 44100;
-		Gdx.app.log(TAG, "Gdx.audio.newAudioDevice");
-		gdxAudio = Gdx.audio.newAudioDevice(freq_, false);
-		Gdx.app.log(TAG, "setVolume");
-		gdxAudio.setVolume(.9f);
-
-		int soundBufferLen = freq_ * 4;
-		pcm_ = new byte[soundBufferLen];
-		pcms_ = new short[pcm_.length / 2];
-
-		long cumulTime = 0;
-
-		Gdx.app.log(TAG, "while: running_");
-		while (running_) {
-			// if (prevMasterVolume != masterVolume) {
-			// prevMasterVolume = masterVolume;
-			// gdxAudio.setVolume(masterVolume);
-			// }
-			long since = timer_.getDelta();
-			// if (paused) {
-			// doSleep(100);
-			// continue;
-			// }
-			// totalTime += since;
-			// max ten minutes for any one song
-			// if (totalTime > maxPlayTime && !loopable_) {
-			// running_ = false;
-			// }
-			float timerRate = 1000.0f / (BPM_ * 0.4f);
-			int intTimerRate = (int) Math.floor(timerRate);
-
-			cumulTime += since;
-
-			while (cumulTime >= intTimerRate) {
-				cumulTime -= intTimerRate;
-				oneShot(intTimerRate);
-			}
-			doSleep((intTimerRate - cumulTime) / 2);
-		}
-		Gdx.app.log(TAG, "done");
-		done();
-		done_ = true;
-	}
-
-	private void doSleep(long ms) {
-		try {
-			Thread.sleep(ms);
-		} catch (InterruptedException e) {
-		}
-	}
-
-	void oneShot(int _timer) {
-		if (tick_ == speed_)
-			tick_ = 0;
-		tick_++;
-
-		if (tick_ == 1) {
-			patternDelay_--;
-			if (patternDelay_ < 0)
-				dispatchNotes();
-		} else {
-			for (int i = 0; i < nbVoices_; i++)
-				voices_[i].updateSoundWithEffect();
-		}
-
-		for (int i = 0; i < nbVoices_; i++)
-			voices_[i].soundUpdate();
-
-		mixSample(_timer);
-	}
-
-	/**
-	 * Starts to play the MOD. The time latency between a note is read and then
-	 * heard is approximatively of 100ms. If the MOD is not loopable and finish,
-	 * you cannot restart it by invoking again this method.
-	 */
-	public void play() {
-		if (isAlive() == true || done_ == true)
-			return;
-
-		timer_ = new Timer();
-		tick_ = 0;
-		patternDelay_ = -1;
-
-		panPower_ = 0.5f;
-		speed_ = 6;
-		BPM_ = 125;
-		MODvolume_ = 0.1f;
-		posChanson_ = 0;
-		running_ = true;
-
-		start();
-	}
-
-	/**
-	 * Stops the MOD. Once a MOD is stopped, it cannot be restarted.
-	 */
-	public void done() {
-		running_ = false;
-		try {
-			join();
-		} catch (InterruptedException e) {
-		}
-	}
-
-	int getPeriod(int _note, int _fine) {
-		_note += 23;
-		int n = _note % 12;
-		int o = _note / 12;
-
-		int h = (8363 * 16 * period_[n]) >> o;
-
-		if (_fine == 0)
-			return 1;
-		else
-			return h / _fine;
-	}
-
 	/**
 	 * Gets the current reading position of the song.
 	 * 
@@ -985,6 +717,19 @@ public class MODPlayer extends Thread {
 		return pcm_;
 	}
 
+	protected int getPeriod(int _note, int _fine) {
+		_note += 23;
+		int n = _note % 12;
+		int o = _note / 12;
+
+		int h = (8363 * 16 * period_[n]) >> o;
+
+		if (_fine == 0)
+			return 1;
+		else
+			return h / _fine;
+	}
+
 	/**
 	 * Tells if the MOD is loopable or not.
 	 * 
@@ -992,6 +737,225 @@ public class MODPlayer extends Thread {
 	 */
 	public boolean isLoopable() {
 		return loopable_;
+	}
+
+	/**
+	 * Loads the MOD.
+	 * 
+	 * @param _input
+	 *            An instance to a PipeIn Class to read data from disk or URL.
+	 * @return NOERR if no error occured.
+	 */
+	@Override
+	public void load(byte[] bytes) {
+		byte tmp[] = new byte[20];
+
+		SeekableBytes _input = new SeekableBytes(bytes, Endian.BIGENDIAN);
+		// Normal MOD?
+		_input.seek(1080);
+		_input.read(tmp, 0, 4);
+		String format = new String(tmp).substring(0, 4);
+		if (format.compareTo("M.K.") == 0)
+			nbVoices_ = 4;
+		else if (format.compareTo("FLT4") == 0)
+			nbVoices_ = 4;
+		else if (format.compareTo("6CHN") == 0)
+			nbVoices_ = 6;
+		else if (format.compareTo("8CHN") == 0)
+			nbVoices_ = 6;
+		else if (format.compareTo("16CH") == 0)
+			nbVoices_ = 6;
+		else
+			throw new OZModRuntimeError(OZMod.ERR.BADFORMAT);
+
+		// Song name
+		_input.seek(0);
+		_input.read(songName_, 0, 20);
+
+		// 31 samples
+		nbInstrus_ = 31;
+		for (int i = 0; i < nbInstrus_; i++) {
+			Instru instru = new Instru();
+			instrus_[i] = instru;
+			_input.read(instru.name, 0, 22);
+
+			instru.len = _input.readUShort() * 2;
+			instru.finetune = ozmod.TrackerConstant.finetune[_input.readByte() & 0xf];
+			instru.vol = _input.readByte();
+			instru.startLoop = _input.readUShort() * 2;
+			instru.lengthLoop = _input.readUShort() * 2;
+			if (instru.lengthLoop < 4)
+				instru.lengthLoop = 0;
+		}
+		// end of header
+
+		_input.seek(950);
+		listLen_ = _input.readUByte();
+
+		_input.seek(952);
+		for (int i = 0; i < 128; i++) {
+			int pattern = _input.readUByte();
+			listPatterns_[i] = pattern;
+		}
+
+		// Calculate the number of patterns
+		nbPatterns_ = 0;
+		for (int i = 0; i < 128; i++) {
+			if (listPatterns_[i] > nbPatterns_)
+				nbPatterns_ = listPatterns_[i];
+		}
+		nbPatterns_++;
+		_input.seek(1084);
+
+		// Read patterns
+		patterns_ = new Pattern[nbPatterns_];
+		for (int i = 0; i < nbPatterns_; i++) {
+			Pattern pat = new Pattern();
+			patterns_[i] = pat;
+
+			for (int j = 0; j < 64; j++) {
+				pat.rows[j] = new Row();
+				pat.rows[j].notes = new Note[nbVoices_];
+				for (int k = 0; k < nbVoices_; k++) {
+					pat.rows[j].notes[k] = new Note();
+
+					int byte1, byte2, byte3, byte4;
+					byte1 = _input.readByte() & 0xff;
+					byte2 = _input.readByte() & 0xff;
+					byte3 = _input.readByte() & 0xff;
+					byte4 = _input.readByte() & 0xff;
+
+					int period = ((byte1 & 0xf) << 8) + byte2;
+					int l = 0;
+					for (l = 0; l < 60; l++) {
+						if (period >= ozmod.TrackerConstant.defaultPeriod[l])
+							break;
+					}
+
+					l++;
+					if (l == 61)
+						l = 0;
+
+					Note note;
+					note = pat.rows[j].notes[k];
+					note.note = l;
+					note.effect = byte3 & 0xf;
+					note.effectOperand = byte4;
+					note.numInstru = (((byte1 & 0xf0) + (byte3 >> 4)) & 0xff) - 1;
+				}
+			}
+		}
+
+		// Sample read
+		_input.seek(1084 + nbPatterns_ * 256 * nbVoices_);
+
+		for (int i = 0; i < 31; i++) {
+			Instru instru = instrus_[i];
+			int len = instru.len;
+			if (len == 0)
+				continue;
+
+			byte pcm[] = new byte[len];
+			_input.readFully(pcm);
+
+			if (instru.lengthLoop == 0)
+				instru.audio.make(pcm, 8, 1);
+			else
+				instru.audio.make(pcm, 8, 1, instru.startLoop, instru.startLoop
+						+ instru.lengthLoop, AudioData.LOOP_FORWARD);
+		}
+
+		voices_ = new Voice[nbVoices_];
+		for (int i = 0; i < nbVoices_; i++) {
+			Voice voice = new Voice();
+			voices_[i] = voice;
+			voice.iVoice_ = i;
+		}
+	}
+
+	@Override
+	protected void oneShot(int _timer) {
+		if (tick_ == speed_)
+			tick_ = 0;
+		tick_++;
+
+		if (tick_ == 1) {
+			patternDelay_--;
+			if (patternDelay_ < 0)
+				dispatchNotes();
+		} else {
+			for (int i = 0; i < nbVoices_; i++)
+				voices_[i].updateSoundWithEffect();
+		}
+
+		for (int i = 0; i < nbVoices_; i++)
+			voices_[i].soundUpdate();
+
+		mixSample(_timer);
+	}
+
+	/**
+	 * Starts to play the MOD. The time latency between a note is read and then
+	 * heard is approximatively of 100ms. If the MOD is not loopable and finish,
+	 * you cannot restart it by invoking again this method.
+	 */
+	@Override
+	public void play() {
+		if (isAlive() == true || done_ == true)
+			return;
+
+		timer_ = new Timer();
+		tick_ = 0;
+		patternDelay_ = -1;
+
+		panPower_ = 0.5f;
+		speed_ = 6;
+		BPM_ = 125;
+		MODvolume_ = 0.1f;
+		posChanson_ = 0;
+		running_ = true;
+
+		start();
+	}
+
+	public void run() {
+		frequency_ = 44100;
+		gdxAudio.setVolume(.9f);
+
+		int soundBufferLen = frequency_ * 4;
+		pcm_ = new byte[soundBufferLen];
+		pcms_ = new short[pcm_.length / 2];
+
+		long cumulTime = 0;
+
+		while (running_) {
+			// if (prevMasterVolume != masterVolume) {
+			// prevMasterVolume = masterVolume;
+			// gdxAudio.setVolume(masterVolume);
+			// }
+			long since = timer_.getDelta();
+			// if (paused) {
+			// doSleep(100);
+			// continue;
+			// }
+			// totalTime += since;
+			// max ten minutes for any one song
+			// if (totalTime > maxPlayTime && !loopable_) {
+			// running_ = false;
+			// }
+			float timerRate = 1000.0f / (BPM_ * 0.4f);
+			int intTimerRate = (int) Math.floor(timerRate);
+
+			cumulTime += since;
+
+			while (cumulTime >= intTimerRate) {
+				cumulTime -= intTimerRate;
+				oneShot(intTimerRate);
+			}
+			doSleep((intTimerRate - cumulTime) / 2);
+		}
+		done();
+		done_ = true;
 	}
 
 	/**
@@ -1005,42 +969,12 @@ public class MODPlayer extends Thread {
 		loopable_ = _b;
 	}
 
-	int nbVoices_;
-	byte songName_[] = new byte[20];
+	public void setPanPower(float _p) {
+		panPower_ = _p;
+	}
 
-	int nbInstrus_;
-	Instru instrus_[] = new Instru[31];
+	public void setVolume(float _vol) {
+		MODvolume_ = _vol;
+	}
 
-	int listLen_;
-	int nbPatterns_;
-	int listPatterns_[] = new int[128];
-	Pattern patterns_[];
-
-	Voice voices_[];
-
-	int speed_, BPM_;
-	float MODvolume_;
-	float panPower_;
-
-	boolean running_;
-	boolean done_ = false;
-
-	Timer timer_;
-
-	int tick_;
-	int patternDelay_;
-
-	int posChanson_, posInPattern_;
-
-	boolean bGotPatternLoop_ = false;
-	int patternPosLoop_ = 0;
-	int patternLoopLeft_ = 0;
-
-	int freq_;
-	private AudioDevice gdxAudio;
-	byte pcm_[];
-	short[] pcms_;
-	ChannelsList chans_ = new ChannelsList();
-
-	boolean loopable_ = false;
 }

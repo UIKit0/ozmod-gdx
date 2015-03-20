@@ -22,15 +22,15 @@ Contact the author: igor@tsarevitch.org
 
 package ozmod;
 
-import java.util.Arrays;
 
 /**
  * A Class allowing to pass data in from disk or an URL.
  */
-public class PipeIn {
-
-	public static final int BIGENDIAN = 0;
-	public static final int LITTLEENDIAN = 1;
+public class SeekableBytes {
+	
+	public static enum Endian {
+		BIGENDIAN, LITTLEENDIAN;
+	}
 
 	/**
 	 * Creates a PipeIn from a disk file.
@@ -41,119 +41,10 @@ public class PipeIn {
 	 *            BIGENDIAN or LITTLEENDIAN depending the data you want to
 	 *            transfer.
 	 */
-	public PipeIn() {
+	public SeekableBytes(byte[] buffer, Endian _endianness) {
+		content_=buffer;
+		endianness_=_endianness;
 	}
-
-	/**
-	 * Creates a PipeIn from an URL.
-	 * 
-	 * @param _url
-	 *            The file from the URL.
-	 * @param _endianness
-	 *            BIGENDIAN or LITTLEENDIAN depending the data you want to
-	 *            transfer.
-	 */
-	// public PipeIn(URL _url, int _endianness)
-	// {
-	// url_ = _url;
-	// endianness_ = _endianness;
-	// }
-
-	/**
-	 * Reads the content of the source in an internal buffer.
-	 * 
-	 * @return NOERR if no error occured.
-	 */
-	public OZMod.ERR readContent() {
-		seek(0);
-		return OZMod.ERR.NOERR;
-		// if (file_ != null)
-		// return readContentFromFile();
-		// if (url_ != null)
-		// return readContentFromURL(url_);
-
-		// return OZMod.proceedError(OZMod.ERR.NEEDINIT);
-	}
-
-	public void loadContentFromBuffer(byte[] buffer, int _endianness) {
-		content_ = Arrays.copyOf(buffer, buffer.length);
-		endianness_ = _endianness;
-	}
-
-	// OZMod.ERR readContentFromFile()
-	// {
-	// RandomAccessFile input;
-	//
-	// try {
-	// input = new RandomAccessFile(file_, "r");
-	// }
-	// catch(FileNotFoundException e)
-	// {
-	// return OZMod.proceedError(OZMod.ERR.FILENOTFOUND);
-	// }
-	//
-	// try {
-	// int fileSize = (int) input.length();
-	// content_ = new byte[fileSize];
-	// input.readFully(content_);
-	// input.close();
-	// }
-	// catch(IOException e) {
-	// return OZMod.proceedError(OZMod.ERR.READERROR);
-	// }
-	//
-	// return OZMod.proceedError(OZMod.ERR.NOERR);
-	// }
-
-	// OZMod.ERR readContentFromURL(URL _url)
-	// {
-	// // first calculate the size of the file
-	// // very lazy evaluation to calculate the length of the stream, it sucks
-	// as hell but didn't find better for now
-	// // in fact I could use a vector but it would suck also anyway
-	//
-	// InputStream stream;
-	// int total = 0;
-	// byte b[] = new byte[1];
-	// try
-	// {
-	// stream = _url.openStream();
-	// while(true)
-	// {
-	// int nb = stream.read(b);
-	// if (nb == -1)
-	// break;
-	// total++;
-	// }
-	// stream.close();
-	// }
-	// catch(IOException e) {
-	// return OZMod.proceedError(OZMod.ERR.READERROR);
-	// }
-	//
-	// content_ = new byte[total];
-	//
-	// int off = 0;
-	// try
-	// {
-	// stream = _url.openStream();
-	// while(true)
-	// {
-	// int nb = stream.read(b);
-	// if (nb == -1)
-	// break;
-	//
-	// content_[off] = b[0];
-	// off ++;
-	// }
-	// stream.close();
-	// }
-	// catch(IOException e) {
-	// return OZMod.proceedError(OZMod.ERR.READERROR);
-	// }
-	//
-	// return OZMod.proceedError(OZMod.ERR.NOERR);
-	// }
 
 	/**
 	 * Reads a portion of the buffer previously loaded.
@@ -197,7 +88,7 @@ public class PipeIn {
 		int b1 = content_[pos_++];
 		int b2 = content_[pos_++];
 
-		if (endianness_ == BIGENDIAN) {
+		if (Endian.BIGENDIAN.equals(endianness_)) {
 			b2 &= 0xff;
 			return (short) ((b1 << 8) | b2);
 		}
@@ -215,7 +106,7 @@ public class PipeIn {
 		int b2 = content_[pos_++];
 		b1 &= 0xff;
 		b2 &= 0xff;
-		if (endianness_ == BIGENDIAN)
+		if (Endian.BIGENDIAN.equals(endianness_))
 			return (short) ((b1 << 8) | b2);
 		else
 			return (short) ((b2 << 8) | b1);
@@ -235,7 +126,7 @@ public class PipeIn {
 		b2 &= 0xff;
 		b3 &= 0xff;
 		b4 &= 0xff;
-		if (endianness_ == BIGENDIAN)
+		if (Endian.BIGENDIAN.equals(endianness_))
 			return (b1 << 24) | (b2 << 16) | (b3 << 8) | b4;
 		else
 			return (b4 << 24) | (b3 << 16) | (b2 << 8) | b1;
@@ -286,5 +177,5 @@ public class PipeIn {
 	// URL url_ = null;
 	byte[] content_;
 	int pos_ = 0;
-	int endianness_;
+	protected Endian endianness_;
 }

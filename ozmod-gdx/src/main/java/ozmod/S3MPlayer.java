@@ -25,77 +25,128 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
 
-import javax.sound.sampled.*;
-
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.audio.AudioDevice;
+import ozmod.SeekableBytes.Endian;
 
 /**
  * A Class to replay S3M file.
  */
-public class S3MPlayer extends Thread {
-	static final int MAX_NB_CHANNELS = 32;
-
-	static final int COMMAND_NONE = 0;
-	static final int COMMAND_VOLSLIDEDOWN = 1;
-	static final int COMMAND_VOLSLIDEUP = 2;
-	static final int COMMAND_SLIDEDOWN = 3;
-	static final int COMMAND_SLIDEUP = 4;
-	static final int COMMAND_TONEPORTAMENTO = 5;
-	static final int COMMAND_VIBRATO = 6;
-	static final int COMMAND_TREMOR = 7;
-	static final int COMMAND_TREMOLO = 8;
-	static final int COMMAND_ARPEGGIO = 9;
-	static final int COMMAND_SAMPLEOFFSET = 10;
-	static final int COMMAND_RETRIG = 11;
-
-	static final int EXTRACOMMAND_NONE = 0;
-	static final int EXTRACOMMAND_DUALK = 1;
-	static final int EXTRACOMMAND_DUALL = 2;
-
-	static final int g_Period[] = { 1712, 1616, 1524, 1440, 1356, 1280, 1208,
-			1140, 1076, 1016, 960, 907 };
-	static final int g_RetrigFadeOutTable[] = { 0, -1, -2, -4, -8, -16, -32,
-			-64, 0, 1, 2, 4, 8, 16, 32, 64 };
-
-	class Instru {
-
-		int type;
-		byte DOSname[] = new byte[0xc];
-		int sampleDataOffset;
-		int sampleDataLen;
-		int startLoop;
-		int endLoop;
-		int defaultVolume;
-		int disk;
-		int packType;
-		int flags;
-		int C2Speed;
-		byte instruName[] = new byte[0x1c];
+public class S3MPlayer extends OZModPlayer {
+	protected static class Instru {
 
 		AudioData audio = new AudioData();
+		int C2Speed;
+		int defaultVolume;
+		int disk;
+		byte DOSname[] = new byte[0xc];
+		int endLoop;
+		int flags;
+		byte instruName[] = new byte[0x1c];
+		int packType;
+		int sampleDataLen;
+		int sampleDataOffset;
+		int startLoop;
+
+		int type;
 	}
 
-	class Note {
-		int note;
-		int octave;
-		int numInstru;
-		int vol;
+	protected static class Note {
 		int command;
 		int commandParam;
-	};
-
-	class Row {
-		Note notes[];
-	};
-
-	class Pattern {
+		int note;
+		int numInstru;
+		int octave;
+		int vol;
+	}
+	protected static class Pattern {
 		Row rows[] = new Row[64];
-	};
+	}
+	protected static class Row {
+		Note notes[];
+	}
+	protected class Voice {
 
-	class Voice {
+		protected int arpeggioCount_, arp1_, arp2_;
+
+		protected boolean bFineVibrato_;
+
+		protected boolean bGotArpeggio_;
+
+		protected boolean bGotNoteCut_;
+
+		protected boolean bGotRetrigNote_;
+
+		protected boolean bGotTremolo_;
+
+		protected boolean bGotTremor_;
+
+		protected boolean bGotVibrato_;
+		protected boolean bNeedToBePlayed_;
+
+		protected boolean bNeedToStopSamplePlaying_;
+
+		protected boolean bNoteIsCutted_;
+		protected Instru instruPlaying_;
+		protected Instru instruToPlay_;
+		protected int lastDCommandParam_;
+		protected int note_, command_, commandParam_, extraCommand_;
+		protected int noteCutDelay_;
+
+		protected int numVoice_;
+		protected int panning_;
+
+		protected int period_, dstPeriod_, periodBAK_;
+
+		protected int portamentoSpeed_;
+
+		protected int portaSpeed_;
+		protected int samplePosJump_;
+		protected Channel sndchan_ = new Channel();
+
+		protected int tickBeforeSample_;
+		protected int tickForRetrigNote_ = -1;
+		protected int tremoloCounter_;
+		protected int tremoloForm_;
+		protected int tremoloSpeed_, tremoloProf_;
+
+		protected int tremorCounter_;
+		protected int tremorValue_;
+		protected int vibratoCounter_;
+		protected int vibratoForm_;
+
+		protected int vibratoSpeed_, vibratoProf_;
+		protected int volFadeOutForRetrig_;
+		protected int volume_, volumeBAK_;
 
 		Voice() {
+		}
+		void evalue_DCommand(int commandParam) {
+			if (commandParam != 0)
+				lastDCommandParam_ = commandParam;
+
+			int actuCommandParam = lastDCommandParam_;
+
+			int x = actuCommandParam >> 4;
+			int y = actuCommandParam & 0xf;
+
+			if (y == 0 || (y == 0x0f && x != 0)) {
+				// VOL SLIDE UP
+				if (y == 0) {
+					// normal
+					command_ = COMMAND_VOLSLIDEUP;
+				} else {
+					// fine vslide
+					volume_ += x;
+				}
+			} else if (x == 0 || (x == 0x0f && y != 0)) {
+				// VOL SLIDE DOWN
+				if (x == 0) {
+					// normal
+					command_ = COMMAND_VOLSLIDEDOWN;
+				} else {
+					// fine vslide
+					volume_ -= y;
+				}
+			}
 		}
 
 		void portamentoToNote() {
@@ -109,25 +160,75 @@ public class S3MPlayer extends Thread {
 					period_ = dstPeriod_;
 			}
 		}
+		void soundUpdate() {
+			int i;
+			Instru instru;
+			int freq;
+			float Vol, Pan;
 
-		void vibrato(boolean _bFine) {
-			int vibSeek;
-			int periodOffset;
+			if (instruPlaying_ == null)
+				return;
 
-			vibSeek = (vibratoCounter_ >> 2) & 0x3f;
+			freq = 14317056 / period_;
 
-			switch (vibratoForm_) {
-			default:
-				periodOffset = TrackerConstant.vibratoTable[vibSeek];
-				break;
+			if (volume_ < 0)
+				volume_ = 0;
+			if (volume_ > 64)
+				volume_ = 64;
+
+			if (bNoteIsCutted_ == false)
+				Vol = (volume_ / 64.0f) * globalVolume_;
+			else
+				Vol = 0;
+
+			if (Vol < 0.0f)
+				Vol = 0.0f;
+			else if (Vol > 1.0f)
+				Vol = 1.0f;
+
+			Pan = (panning_ - 128) / 128.0f;
+
+			if (bGotRetrigNote_ == true) {
+				if ((tick_ - 1) % tickForRetrigNote_ == tickForRetrigNote_ - 1) {
+					bNeedToBePlayed_ = true;
+					volume_ += g_RetrigFadeOutTable[volFadeOutForRetrig_];
+				}
+			}
+			if (bGotNoteCut_ == true) {
+				if ((tick_ - 2) == noteCutDelay_)
+					bNoteIsCutted_ = true;
 			}
 
-			periodOffset *= vibratoProf_;
-			periodOffset >>= 7;
-			if (_bFine == false)
-				periodOffset <<= 2;
-			period_ = periodBAK_ + periodOffset;
-			vibratoCounter_ += vibratoSpeed_;
+			if (bNeedToBePlayed_ == false) {
+				sndchan_.frequency = freq;
+				sndchan_.step = freq / (float) (frequency_);
+				sndchan_.setPan(Pan);
+				sndchan_.vol = Vol;
+				return;
+			}
+
+			int StartPos;
+			if (command_ == COMMAND_SAMPLEOFFSET) {
+				command_ = COMMAND_NONE;
+				StartPos = samplePosJump_;
+			} else
+				StartPos = 0;
+
+			chansList_.removeChannel(sndchan_);
+			// sndchan_.stop();
+
+			if (tick_ >= tickBeforeSample_) {
+				sndchan_.frequency = freq;
+				sndchan_.step = freq / (float) (frequency_);
+				sndchan_.vol = Vol;
+				sndchan_.setPan(Pan);
+				sndchan_.pos = (float) StartPos;
+				sndchan_.audio = instruPlaying_.audio;
+				chansList_.addChannel(sndchan_);
+
+				bNeedToBePlayed_ = false;
+				tickBeforeSample_ = 0;
+			}
 		}
 
 		void tremolo() {
@@ -148,7 +249,6 @@ public class S3MPlayer extends Thread {
 
 			tremoloCounter_ += tremoloSpeed_;
 		}
-
 		void updateSoundWithEffect() {
 			int on, off, pos;
 
@@ -222,447 +322,80 @@ public class S3MPlayer extends Thread {
 				break;
 			}
 		}
+		void vibrato(boolean _bFine) {
+			int vibSeek;
+			int periodOffset;
 
-		void soundUpdate() {
-			int i;
-			Instru instru;
-			int freq;
-			float Vol, Pan;
+			vibSeek = (vibratoCounter_ >> 2) & 0x3f;
 
-			if (instruPlaying_ == null)
-				return;
-
-			freq = 14317056 / period_;
-
-			if (volume_ < 0)
-				volume_ = 0;
-			if (volume_ > 64)
-				volume_ = 64;
-
-			if (bNoteIsCutted_ == false)
-				Vol = (volume_ / 64.0f) * globalVolume_;
-			else
-				Vol = 0;
-
-			if (Vol < 0.0f)
-				Vol = 0.0f;
-			else if (Vol > 1.0f)
-				Vol = 1.0f;
-
-			Pan = (panning_ - 128) / 128.0f;
-
-			if (bGotRetrigNote_ == true) {
-				if ((tick_ - 1) % tickForRetrigNote_ == tickForRetrigNote_ - 1) {
-					bNeedToBePlayed_ = true;
-					volume_ += g_RetrigFadeOutTable[volFadeOutForRetrig_];
-				}
-			}
-			if (bGotNoteCut_ == true) {
-				if ((tick_ - 2) == noteCutDelay_)
-					bNoteIsCutted_ = true;
+			switch (vibratoForm_) {
+			default:
+				periodOffset = TrackerConstant.vibratoTable[vibSeek];
+				break;
 			}
 
-			if (bNeedToBePlayed_ == false) {
-				sndchan_.frequency = freq;
-				sndchan_.step = freq / (float) (freq_);
-				sndchan_.setPan(Pan);
-				sndchan_.vol = Vol;
-				return;
-			}
-
-			int StartPos;
-			if (command_ == COMMAND_SAMPLEOFFSET) {
-				command_ = COMMAND_NONE;
-				StartPos = samplePosJump_;
-			} else
-				StartPos = 0;
-
-			chans_.removeChannel(sndchan_);
-			// sndchan_.stop();
-
-			if (tick_ >= tickBeforeSample_) {
-				sndchan_.frequency = freq;
-				sndchan_.step = freq / (float) (freq_);
-				sndchan_.vol = Vol;
-				sndchan_.setPan(Pan);
-				sndchan_.pos = (float) StartPos;
-				sndchan_.audio = instruPlaying_.audio;
-				chans_.addChannel(sndchan_);
-
-				bNeedToBePlayed_ = false;
-				tickBeforeSample_ = 0;
-			}
+			periodOffset *= vibratoProf_;
+			periodOffset >>= 7;
+			if (_bFine == false)
+				periodOffset <<= 2;
+			period_ = periodBAK_ + periodOffset;
+			vibratoCounter_ += vibratoSpeed_;
 		}
-
-		void evalue_DCommand(int commandParam) {
-			if (commandParam != 0)
-				lastDCommandParam_ = commandParam;
-
-			int actuCommandParam = lastDCommandParam_;
-
-			int x = actuCommandParam >> 4;
-			int y = actuCommandParam & 0xf;
-
-			if (y == 0 || (y == 0x0f && x != 0)) {
-				// VOL SLIDE UP
-				if (y == 0) {
-					// normal
-					command_ = COMMAND_VOLSLIDEUP;
-				} else {
-					// fine vslide
-					volume_ += x;
-				}
-			} else if (x == 0 || (x == 0x0f && y != 0)) {
-				// VOL SLIDE DOWN
-				if (x == 0) {
-					// normal
-					command_ = COMMAND_VOLSLIDEDOWN;
-				} else {
-					// fine vslide
-					volume_ -= y;
-				}
-			}
-		}
-
-		Instru instruPlaying_;
-		Instru instruToPlay_;
-
-		Channel sndchan_ = new Channel();
-
-		int numVoice_;
-		int period_, dstPeriod_, periodBAK_;
-		int arpeggioCount_, arp1_, arp2_;
-		int note_, command_, commandParam_, extraCommand_;
-		boolean bNeedToStopSamplePlaying_;
-		boolean bNeedToBePlayed_;
-
-		int lastDCommandParam_;
-		int portaSpeed_;
-
-		int portamentoSpeed_;
-
-		boolean bGotArpeggio_;
-
-		int tremorValue_;
-		int tremorCounter_;
-		boolean bGotTremor_;
-
-		boolean bGotVibrato_;
-		int vibratoCounter_;
-		int vibratoForm_;
-		int vibratoSpeed_, vibratoProf_;
-		boolean bFineVibrato_;
-
-		boolean bGotTremolo_;
-		int tremoloCounter_;
-		int tremoloForm_;
-		int tremoloSpeed_, tremoloProf_;
-
-		boolean bGotNoteCut_;
-		int noteCutDelay_;
-		boolean bNoteIsCutted_;
-
-		int volume_, volumeBAK_;
-		int panning_;
-
-		int tickBeforeSample_;
-		int samplePosJump_;
-
-		boolean bGotRetrigNote_;
-		int tickForRetrigNote_ = -1;
-		int volFadeOutForRetrig_;
+	}
+	protected static final int COMMAND_ARPEGGIO = 9;
+	protected static final int COMMAND_NONE = 0;
+	protected static final int COMMAND_RETRIG = 11;
+	protected static final int COMMAND_SAMPLEOFFSET = 10;
+	protected static final int COMMAND_SLIDEDOWN = 3;
+	protected static final int COMMAND_SLIDEUP = 4;
+	protected static final int COMMAND_TONEPORTAMENTO = 5;
+	protected static final int COMMAND_TREMOLO = 8;
+	protected static final int COMMAND_TREMOR = 7;
+	protected static final int COMMAND_VIBRATO = 6;
+	protected static final int COMMAND_VOLSLIDEDOWN = 1;
+	protected static final int COMMAND_VOLSLIDEUP = 2;
+	protected static final int EXTRACOMMAND_DUALK = 1;
+	protected static final int EXTRACOMMAND_DUALL = 2;
+	protected static final int EXTRACOMMAND_NONE = 0;;
+	protected static final int g_Period[] = { 1712, 1616, 1524, 1440, 1356,
+			1280, 1208, 1140, 1076, 1016, 960, 907 };;
+	protected static final int g_RetrigFadeOutTable[] = { 0, -1, -2, -4, -8,
+			-16, -32, -64, 0, 1, 2, 4, 8, 16, 32, 64 };;
+	protected static final int MAX_NB_CHANNELS = 32;
+	protected boolean bGotPatternLoop_;
+	protected int chanRemap_[] = new int[MAX_NB_CHANNELS];
+	protected int fileFlags_;
+	protected int fileType_;
+	protected float globalVolume_ = 1.0f;
+	protected int ID_;
+	protected Instru instrus_[];
+	protected int listLen_;
+	protected float localVolume_;
+	protected int masterMultiplier_;
+	protected int nbInstrus_;
+	protected int nbPatterns_;
+	protected int numListPattern_[];
+	protected int panChannel_[] = new int[32];
+	protected int patternDelay_ = -1;
+	protected int patternLoopLeft_;
+	protected int patternPosLoop_;
+	protected Pattern patterns_[];
+	protected int posChanson_ = 0;
+	protected int posInPattern_;
+	protected int realNbChannels_;
+	protected float realVolume_;
+	protected byte songName_[] = new byte[0x1c];
+	protected int specChannel_[] = new int[32];
+	protected int startSpeed_;
+	protected int startTempo_;
+	protected int tempo_;
+	protected Voice voices_[];
+	protected int volumeMaster_;
+	public S3MPlayer(IAudioDevice audioDevice) {
+		super(audioDevice);
 	}
 
-	private short[] pcms_;;
-
-	public S3MPlayer() {
-	}
-
-	protected void finalize() {
-		running_ = false;
-	}
-
-	/**
-	 * Loads the S3M.
-	 * 
-	 * @param _input
-	 *            An instance to a PipeIn Class to read data from disk or URL.
-	 * @return NOERR if no error occured.
-	 */
-	public OZMod.ERR load(PipeIn _input) {
-		byte tmp[] = new byte[4];
-
-		_input.readContent();
-
-		_input.readFully(songName_);
-		ID_ = _input.readByte();
-		fileType_ = _input.readByte();
-		_input.forward(2);
-
-		listLen_ = _input.readUShort();
-		nbInstrus_ = _input.readUShort();
-		nbPatterns_ = _input.readUShort();
-		fileFlags_ = _input.readUShort();
-		_input.forward(2); // version info
-		_input.forward(2); // format version
-		_input.read(tmp, 0, 4);
-		String format = new String(tmp).substring(0, 4);
-		if (format.compareTo("SCRM") != 0)
-			return OZMod.proceedError(OZMod.ERR.BADFORMAT);
-
-		int initialPanID;
-
-		volumeMaster_ = _input.readUByte();
-		startSpeed_ = _input.readUByte();
-		startTempo_ = _input.readUByte();
-		masterMultiplier_ = _input.readUByte();
-		_input.forward(1);
-		initialPanID = _input.readUByte();
-		_input.forward(10);
-		for (int i = 0; i < 32; i++)
-			specChannel_[i] = _input.readUByte();
-
-		for (int i = 0; i < MAX_NB_CHANNELS; i++)
-			chanRemap_[i] = 255;
-
-		int nbChannels = 0;
-		for (int i = 0; i < 32; i++) {
-			int specChannel = specChannel_[i];
-			if (specChannel < 16) {
-				chanRemap_[i] = nbChannels;
-				nbChannels++;
-			}
-		}
-		realNbChannels_ = nbChannels;
-
-		numListPattern_ = new int[listLen_];
-		for (int i = 0; i < listLen_; i++) {
-			int num = _input.readUByte();
-			numListPattern_[i] = num;
-		}
-
-		// Read instru and related info
-		instrus_ = new Instru[nbInstrus_];
-		int actuFilePos = _input.tell();
-		for (int numInstru = 0; numInstru < nbInstrus_; numInstru++) {
-			Instru instru = new Instru();
-			instrus_[numInstru] = instru;
-
-			int offsetInstru;
-			_input.seek(actuFilePos);
-			actuFilePos += 2;
-			offsetInstru = _input.readUShort();
-			offsetInstru <<= 4;
-			_input.seek(offsetInstru);
-
-			instru.type = _input.readUByte();
-			_input.readFully(instru.DOSname);
-			byte doff[] = new byte[3];
-			_input.read(doff, 0, 3);
-			int b1 = doff[0];
-			int b2 = (doff[1] & 0xff) << 8;
-			int b3 = (doff[2] & 0xff) << 16;
-			instru.sampleDataOffset = b1 | b2 | b3;
-			instru.sampleDataLen = _input.readInt();
-			instru.startLoop = _input.readInt();
-			instru.endLoop = _input.readInt();
-			instru.defaultVolume = _input.readUByte();
-			instru.disk = _input.readUByte();
-			instru.packType = _input.readUByte();
-			instru.flags = _input.readUByte();
-			instru.C2Speed = _input.readInt();
-			_input.forward(4); // non-used
-			_input.forward(2); // gravis memory position
-			_input.forward(6); // used for ?
-			_input.readFully(instru.instruName);
-
-			int strID;
-			strID = _input.readInt();
-
-			int sizeForSample = instru.sampleDataLen;
-			if (sizeForSample == 0)
-				continue;
-
-			int nbC = 1;
-			int nbBits = 8;
-
-			if ((instru.flags & 2) != 0) {
-				nbC = 2;
-				sizeForSample *= 2;
-			}
-			if ((instru.flags & 4) != 0) {
-				nbBits = 16;
-				sizeForSample *= 2;
-			}
-
-			int startLoop = instru.startLoop;
-			int endLoop = instru.endLoop;
-
-			int off = instru.sampleDataOffset >> 4;
-			_input.seek(off);
-
-			byte pcm[] = new byte[sizeForSample];
-			_input.readFully(pcm);
-
-			if (nbBits == 8) {
-				for (int i = 0; i < sizeForSample; i++)
-					pcm[i] -= 128;
-
-				if (nbC == 2) {
-					// left and right are entrelaced
-					byte tmpb[] = new byte[pcm.length];
-					int j = 0;
-					for (int i = 0; i < instru.sampleDataLen; i++) {
-						byte left = pcm[i];
-						byte right = pcm[i + instru.sampleDataLen];
-						tmpb[j++] = left;
-						tmpb[j++] = right;
-					}
-					pcm = tmpb;
-				}
-			} else {
-				int nbsamp = instru.sampleDataLen * nbC;
-				for (int i = 0; i < nbsamp; i++) {
-					short b = (short) (pcm[i * 2 + 0] & 0xff);
-					b |= (short) (pcm[i * 2 + 1] << 8);
-					b -= 32768;
-					pcm[i * 2 + 0] = (byte) (b & 0xff);
-					pcm[i * 2 + 1] = (byte) (b >> 8);
-				}
-
-				if (nbC == 2) {
-					// left and right are entrelaced
-					byte tmpb[] = new byte[pcm.length];
-					int j = 0;
-					for (int i = 0; i < instru.sampleDataLen; i++) {
-						byte left0 = pcm[i * 2];
-						byte left1 = pcm[i * 2 + 1];
-
-						byte right0 = pcm[i * 2 + instru.sampleDataLen];
-						byte right1 = pcm[i * 2 + 1 + instru.sampleDataLen * 2];
-
-						tmpb[j++] = left0;
-						tmpb[j++] = left1;
-						tmpb[j++] = right0;
-						tmpb[j++] = right1;
-					}
-					pcm = tmpb;
-				}
-			}
-
-			if ((instru.flags & 1) == 0)
-				instru.audio.make(pcm, nbBits, nbC);
-			else
-				instru.audio.make(pcm, nbBits, nbC, startLoop, endLoop,
-						AudioData.LOOP_FORWARD);
-		}
-
-		// Read pattern
-		patterns_ = new Pattern[nbPatterns_];
-		for (int numPattern = 0; numPattern < nbPatterns_; numPattern++) {
-
-			Pattern pattern = new Pattern();
-			patterns_[numPattern] = pattern;
-
-			int offsetPattern = 0;
-			_input.seek(actuFilePos);
-			actuFilePos += 2;
-
-			offsetPattern = _input.readUShort();
-			offsetPattern <<= 4;
-			_input.seek(offsetPattern + 2);
-
-			Note bidonNote = new Note();
-			Note actuNote;
-
-			int numRow = 0;
-			while (numRow < 64) {
-				Row row = new Row();
-				pattern.rows[numRow] = row;
-				row.notes = new Note[nbChannels];
-				for (int i = 0; i < nbChannels; i++)
-					row.notes[i] = new Note();
-
-				while (true) {
-					int byt = 0;
-					byt = _input.readUByte();
-					if (byt == 0)
-						break;
-
-					int numChan = byt & 31;
-					int realNumChan = chanRemap_[numChan];
-
-					if (realNumChan < 16)
-						actuNote = row.notes[realNumChan];
-					else
-						actuNote = bidonNote;
-
-					if ((byt & 32) != 0) {
-						int note;
-						note = _input.readUByte();
-						actuNote.numInstru = _input.readUByte();
-						actuNote.note = ((note >> 4) * 12) + (note & 0xf);
-					}
-
-					if ((byt & 64) != 0) {
-						actuNote.vol = _input.readUByte();
-						actuNote.vol++;
-					}
-
-					if ((byt & 128) != 0) {
-						actuNote.command = _input.readUByte();
-						actuNote.commandParam = _input.readUByte();
-					}
-				}
-				numRow++;
-			}
-		}
-
-		voices_ = new Voice[realNbChannels_];
-		for (int i = 0; i < realNbChannels_; i++) {
-			Voice voice = new Voice();
-			voices_[i] = voice;
-
-			voice.numVoice_ = i;
-			if ((i & 1) != 0)
-				voice.panning_ = 192;
-			else
-				voice.panning_ = 64;
-		}
-
-		if (initialPanID == 252) {
-			_input.seek(actuFilePos);
-			for (int i = 0; i < 32; i++)
-				panChannel_[i] = _input.readUByte();
-
-			int j = 0;
-			for (int i = 0; i < 32; i++) {
-				if (specChannel_[i] < 16 && (panChannel_[i] & 0x20) != 0) {
-					int pan = panChannel_[i] & 0xf;
-					voices_[j++].panning_ = (short) (pan << 4);
-				}
-			}
-		}
-
-		speed_ = startSpeed_;
-		tempo_ = startTempo_;
-
-		return OZMod.proceedError(OZMod.ERR.NOERR);
-	}
-
-	int getST3period(int note, int c2speed) {
-		int n = note % 12;
-		int o = note / 12;
-
-		int h = (8363 * 16 * g_Period[n]) >> o;
-
-		if (c2speed == 0)
-			return 1;
-		else
-			return h / c2speed;
-	}
-
-	void dispatchNotes() {
+	protected void dispatchNotes() {
 		int note, numInstru, volume, command, commandParam;
 		int actuCommandParam;
 		int com, par;
@@ -731,7 +464,7 @@ public class S3MPlayer extends Thread {
 				if (numInstru <= nbInstrus_)
 					voice.instruToPlay_ = instrus_[numInstru - 1];
 				else {
-					chans_.removeChannel(voice.sndchan_);
+					chansList_.removeChannel(voice.sndchan_);
 					voice.instruPlaying_ = null;
 					voice.instruToPlay_ = null;
 				}
@@ -1075,104 +808,9 @@ public class S3MPlayer extends Thread {
 			}
 		}
 	}
-
-	private AudioDevice gdxAudio;
-
-	/**
-	 * Never call this method directly. Use play() instead.
-	 */
-	public void run() {
-		freq_ = 44100;
-		gdxAudio = Gdx.audio.newAudioDevice(freq_, false);
-		gdxAudio.setVolume(1f);
-
-		int soundBufferLen = freq_ * 4;
-		pcm_ = new byte[soundBufferLen];
-		pcms_ = new short[pcm_.length / 2];
-
-		long cumulTime = 0;
-		long startTime = timer_.getElapsed();
-		boolean lineStarted = false;
-
-		while (running_) {
-
-			float timerRate = 1000.0f / (tempo_ * 0.4f);
-			int intTimerRate = (int) Math.floor(timerRate);
-
-			long since = timer_.getDelta();
-			cumulTime += since;
-
-			while (cumulTime >= intTimerRate) {
-				cumulTime -= intTimerRate;
-				oneShot(intTimerRate);
-			}
-			doSleep((intTimerRate - cumulTime) / 2);
-
-		}
-		done_ = true;
+	protected void finalize() {
+		running_ = false;
 	}
-
-	private void doSleep(long ms) {
-		try {
-			Thread.sleep(ms);
-		} catch (InterruptedException e) {
-		}
-	}
-
-	void oneShot(int _timer) {
-		if (tick_ == speed_)
-			tick_ = 0;
-		tick_++;
-
-		if (tick_ == 1) {
-			patternDelay_--;
-			if (patternDelay_ < 0)
-				dispatchNotes();
-		} else {
-			for (int i = 0; i < realNbChannels_; i++)
-				voices_[i].updateSoundWithEffect();
-		}
-
-		for (int i = 0; i < realNbChannels_; i++)
-			voices_[i].soundUpdate();
-
-		mixSample(_timer);
-	}
-
-	void mixSample(int _time) {
-		int nbsamp = freq_ / (1000 / _time);
-		Arrays.fill(pcm_, (byte) 0);
-		chans_.mix(nbsamp, pcm_);
-		ByteBuffer.wrap(pcm_).order(ByteOrder.BIG_ENDIAN).asShortBuffer()
-				.get(pcms_, 0, nbsamp * 2);
-		gdxAudio.writeSamples(pcms_, 0, nbsamp * 2);
-	}
-
-	/**
-	 * Starts to play the S3M. The time latency between a note is read and then
-	 * heard is approximatively of 100ms. If the S3M is not loopable and finish,
-	 * you cannot restart it by invoking again this method.
-	 */
-	public void play() {
-		if (isAlive() == true || done_ == true)
-			return;
-
-		timer_ = new Timer();
-		running_ = true;
-
-		start();
-	}
-
-	/**
-	 * Gets the internal buffer used to mix the samples together. It can be used
-	 * for instance to analyze the wave, apply effect or whatever.
-	 * 
-	 * @return The internal mix buffer.
-	 */
-	public byte[] getMixBuffer() {
-		return pcm_;
-	}
-
 	/**
 	 * Gets the current reading position of the song.
 	 * 
@@ -1192,12 +830,377 @@ public class S3MPlayer extends Thread {
 	}
 
 	/**
+	 * Gets the internal buffer used to mix the samples together. It can be used
+	 * for instance to analyze the wave, apply effect or whatever.
+	 * 
+	 * @return The internal mix buffer.
+	 */
+	public byte[] getMixBuffer() {
+		return pcm_;
+	}
+	protected int getST3period(int note, int c2speed) {
+		int n = note % 12;
+		int o = note / 12;
+
+		int h = (8363 * 16 * g_Period[n]) >> o;
+
+		if (c2speed == 0)
+			return 1;
+		else
+			return h / c2speed;
+	}
+	/**
 	 * Tells if the S3M is loopable or not.
 	 * 
 	 * @return true if loopable, false otherwhise.
 	 */
 	public boolean isLoopable() {
 		return loopable_;
+	}
+	/**
+	 * Loads the S3M.
+	 * 
+	 * @param _input
+	 *            An instance to a PipeIn Class to read data from disk or URL.
+	 * @return NOERR if no error occured.
+	 */
+	@Override
+	public void load(byte[] bytes) {
+
+		SeekableBytes _input = new SeekableBytes(bytes, Endian.BIGENDIAN);
+
+		byte tmp[] = new byte[4];
+
+		_input.readFully(songName_);
+		ID_ = _input.readByte();
+		fileType_ = _input.readByte();
+		_input.forward(2);
+
+		listLen_ = _input.readUShort();
+		nbInstrus_ = _input.readUShort();
+		nbPatterns_ = _input.readUShort();
+		fileFlags_ = _input.readUShort();
+		_input.forward(2); // version info
+		_input.forward(2); // format version
+		_input.read(tmp, 0, 4);
+		String format = new String(tmp).substring(0, 4);
+		if (format.compareTo("SCRM") != 0)
+			throw new OZModRuntimeError(OZMod.ERR.BADFORMAT);
+
+		int initialPanID;
+
+		volumeMaster_ = _input.readUByte();
+		startSpeed_ = _input.readUByte();
+		startTempo_ = _input.readUByte();
+		masterMultiplier_ = _input.readUByte();
+		_input.forward(1);
+		initialPanID = _input.readUByte();
+		_input.forward(10);
+		for (int i = 0; i < 32; i++)
+			specChannel_[i] = _input.readUByte();
+
+		for (int i = 0; i < MAX_NB_CHANNELS; i++)
+			chanRemap_[i] = 255;
+
+		int nbChannels = 0;
+		for (int i = 0; i < 32; i++) {
+			int specChannel = specChannel_[i];
+			if (specChannel < 16) {
+				chanRemap_[i] = nbChannels;
+				nbChannels++;
+			}
+		}
+		realNbChannels_ = nbChannels;
+
+		numListPattern_ = new int[listLen_];
+		for (int i = 0; i < listLen_; i++) {
+			int num = _input.readUByte();
+			numListPattern_[i] = num;
+		}
+
+		// Read instru and related info
+		instrus_ = new Instru[nbInstrus_];
+		int actuFilePos = _input.tell();
+		for (int numInstru = 0; numInstru < nbInstrus_; numInstru++) {
+			Instru instru = new Instru();
+			instrus_[numInstru] = instru;
+
+			int offsetInstru;
+			_input.seek(actuFilePos);
+			actuFilePos += 2;
+			offsetInstru = _input.readUShort();
+			offsetInstru <<= 4;
+			_input.seek(offsetInstru);
+
+			instru.type = _input.readUByte();
+			_input.readFully(instru.DOSname);
+			byte doff[] = new byte[3];
+			_input.read(doff, 0, 3);
+			int b1 = doff[0];
+			int b2 = (doff[1] & 0xff) << 8;
+			int b3 = (doff[2] & 0xff) << 16;
+			instru.sampleDataOffset = b1 | b2 | b3;
+			instru.sampleDataLen = _input.readInt();
+			instru.startLoop = _input.readInt();
+			instru.endLoop = _input.readInt();
+			instru.defaultVolume = _input.readUByte();
+			instru.disk = _input.readUByte();
+			instru.packType = _input.readUByte();
+			instru.flags = _input.readUByte();
+			instru.C2Speed = _input.readInt();
+			_input.forward(4); // non-used
+			_input.forward(2); // gravis memory position
+			_input.forward(6); // used for ?
+			_input.readFully(instru.instruName);
+
+			int strID;
+			strID = _input.readInt();
+
+			int sizeForSample = instru.sampleDataLen;
+			if (sizeForSample == 0)
+				continue;
+
+			int nbC = 1;
+			int nbBits = 8;
+
+			if ((instru.flags & 2) != 0) {
+				nbC = 2;
+				sizeForSample *= 2;
+			}
+			if ((instru.flags & 4) != 0) {
+				nbBits = 16;
+				sizeForSample *= 2;
+			}
+
+			int startLoop = instru.startLoop;
+			int endLoop = instru.endLoop;
+
+			int off = instru.sampleDataOffset >> 4;
+			_input.seek(off);
+
+			byte pcm[] = new byte[sizeForSample];
+			_input.readFully(pcm);
+
+			if (nbBits == 8) {
+				for (int i = 0; i < sizeForSample; i++)
+					pcm[i] -= 128;
+
+				if (nbC == 2) {
+					// left and right are entrelaced
+					byte tmpb[] = new byte[pcm.length];
+					int j = 0;
+					for (int i = 0; i < instru.sampleDataLen; i++) {
+						byte left = pcm[i];
+						byte right = pcm[i + instru.sampleDataLen];
+						tmpb[j++] = left;
+						tmpb[j++] = right;
+					}
+					pcm = tmpb;
+				}
+			} else {
+				int nbsamp = instru.sampleDataLen * nbC;
+				for (int i = 0; i < nbsamp; i++) {
+					short b = (short) (pcm[i * 2 + 0] & 0xff);
+					b |= (short) (pcm[i * 2 + 1] << 8);
+					b -= 32768;
+					pcm[i * 2 + 0] = (byte) (b & 0xff);
+					pcm[i * 2 + 1] = (byte) (b >> 8);
+				}
+
+				if (nbC == 2) {
+					// left and right are entrelaced
+					byte tmpb[] = new byte[pcm.length];
+					int j = 0;
+					for (int i = 0; i < instru.sampleDataLen; i++) {
+						byte left0 = pcm[i * 2];
+						byte left1 = pcm[i * 2 + 1];
+
+						byte right0 = pcm[i * 2 + instru.sampleDataLen];
+						byte right1 = pcm[i * 2 + 1 + instru.sampleDataLen * 2];
+
+						tmpb[j++] = left0;
+						tmpb[j++] = left1;
+						tmpb[j++] = right0;
+						tmpb[j++] = right1;
+					}
+					pcm = tmpb;
+				}
+			}
+
+			if ((instru.flags & 1) == 0)
+				instru.audio.make(pcm, nbBits, nbC);
+			else
+				instru.audio.make(pcm, nbBits, nbC, startLoop, endLoop,
+						AudioData.LOOP_FORWARD);
+		}
+
+		// Read pattern
+		patterns_ = new Pattern[nbPatterns_];
+		for (int numPattern = 0; numPattern < nbPatterns_; numPattern++) {
+
+			Pattern pattern = new Pattern();
+			patterns_[numPattern] = pattern;
+
+			int offsetPattern = 0;
+			_input.seek(actuFilePos);
+			actuFilePos += 2;
+
+			offsetPattern = _input.readUShort();
+			offsetPattern <<= 4;
+			_input.seek(offsetPattern + 2);
+
+			Note bidonNote = new Note();
+			Note actuNote;
+
+			int numRow = 0;
+			while (numRow < 64) {
+				Row row = new Row();
+				pattern.rows[numRow] = row;
+				row.notes = new Note[nbChannels];
+				for (int i = 0; i < nbChannels; i++)
+					row.notes[i] = new Note();
+
+				while (true) {
+					int byt = 0;
+					byt = _input.readUByte();
+					if (byt == 0)
+						break;
+
+					int numChan = byt & 31;
+					int realNumChan = chanRemap_[numChan];
+
+					if (realNumChan < 16)
+						actuNote = row.notes[realNumChan];
+					else
+						actuNote = bidonNote;
+
+					if ((byt & 32) != 0) {
+						int note;
+						note = _input.readUByte();
+						actuNote.numInstru = _input.readUByte();
+						actuNote.note = ((note >> 4) * 12) + (note & 0xf);
+					}
+
+					if ((byt & 64) != 0) {
+						actuNote.vol = _input.readUByte();
+						actuNote.vol++;
+					}
+
+					if ((byt & 128) != 0) {
+						actuNote.command = _input.readUByte();
+						actuNote.commandParam = _input.readUByte();
+					}
+				}
+				numRow++;
+			}
+		}
+
+		voices_ = new Voice[realNbChannels_];
+		for (int i = 0; i < realNbChannels_; i++) {
+			Voice voice = new Voice();
+			voices_[i] = voice;
+
+			voice.numVoice_ = i;
+			if ((i & 1) != 0)
+				voice.panning_ = 192;
+			else
+				voice.panning_ = 64;
+		}
+
+		if (initialPanID == 252) {
+			_input.seek(actuFilePos);
+			for (int i = 0; i < 32; i++)
+				panChannel_[i] = _input.readUByte();
+
+			int j = 0;
+			for (int i = 0; i < 32; i++) {
+				if (specChannel_[i] < 16 && (panChannel_[i] & 0x20) != 0) {
+					int pan = panChannel_[i] & 0xf;
+					voices_[j++].panning_ = (short) (pan << 4);
+				}
+			}
+		}
+
+		speed_ = startSpeed_;
+		tempo_ = startTempo_;
+
+		return;
+	}
+	@Override
+	protected void mixSample(int _time) {
+		int nbsamp = frequency_ / (1000 / _time);
+		Arrays.fill(pcm_, (byte) 0);
+		chansList_.mix(nbsamp, pcm_);
+		ByteBuffer.wrap(pcm_).order(ByteOrder.BIG_ENDIAN).asShortBuffer()
+				.get(pcms_, 0, nbsamp * 2);
+		gdxAudio.writeSamples(pcms_, 0, nbsamp * 2);
+	}
+	protected void oneShot(int _timer) {
+		if (tick_ == speed_)
+			tick_ = 0;
+		tick_++;
+
+		if (tick_ == 1) {
+			patternDelay_--;
+			if (patternDelay_ < 0)
+				dispatchNotes();
+		} else {
+			for (int i = 0; i < realNbChannels_; i++)
+				voices_[i].updateSoundWithEffect();
+		}
+
+		for (int i = 0; i < realNbChannels_; i++)
+			voices_[i].soundUpdate();
+
+		mixSample(_timer);
+	}
+
+	/**
+	 * Starts to play the S3M. The time latency between a note is read and then
+	 * heard is approximatively of 100ms. If the S3M is not loopable and finish,
+	 * you cannot restart it by invoking again this method.
+	 */
+	@Override
+	public void play() {
+		if (isAlive() == true || done_ == true)
+			return;
+
+		timer_ = new Timer();
+		running_ = true;
+
+		start();
+	}
+	/**
+	 * Never call this method directly. Use play() instead.
+	 */
+	@Override
+	public void run() {
+		frequency_ = 44100;
+		gdxAudio.setVolume(1f);
+
+		int soundBufferLen = frequency_ * 4;
+		pcm_ = new byte[soundBufferLen];
+		pcms_ = new short[pcm_.length / 2];
+
+		long cumulTime = 0;
+		long startTime = timer_.getElapsed();
+
+		while (running_) {
+
+			float timerRate = 1000.0f / (tempo_ * 0.4f);
+			int intTimerRate = (int) Math.floor(timerRate);
+
+			long since = timer_.getDelta();
+			cumulTime += since;
+
+			while (cumulTime >= intTimerRate) {
+				cumulTime -= intTimerRate;
+				oneShot(intTimerRate);
+			}
+			doSleep((intTimerRate - cumulTime) / 2);
+
+		}
+		done_ = true;
 	}
 
 	/**
@@ -1210,64 +1213,4 @@ public class S3MPlayer extends Thread {
 	public void setLoopable(boolean _b) {
 		loopable_ = _b;
 	}
-
-	/**
-	 * Stops the S3M. Once a S3M is stopped, it cannot be restarted.
-	 */
-	public void done() {
-		running_ = false;
-		try {
-			join();
-		} catch (InterruptedException e) {
-		}
-	}
-
-	byte songName_[] = new byte[0x1c];
-	int ID_;
-	int fileType_;
-	int listLen_;
-	int nbInstrus_;
-	int nbPatterns_;
-	int fileFlags_;
-	int volumeMaster_;
-	int startSpeed_;
-	int startTempo_;
-	int masterMultiplier_;
-	int specChannel_[] = new int[32];
-
-	int realNbChannels_;
-	int chanRemap_[] = new int[MAX_NB_CHANNELS];
-	int numListPattern_[];
-	Pattern patterns_[];
-	Voice voices_[];
-	int panChannel_[] = new int[32];
-
-	Instru instrus_[];
-
-	int freq_;
-	// SourceDataLine line_ = null;
-	byte pcm_[];
-	ChannelsList chans_ = new ChannelsList();
-
-	float realVolume_;
-	float localVolume_;
-	float globalVolume_ = 1.0f;
-
-	boolean bGotPatternLoop_;
-	int patternPosLoop_;
-	int patternLoopLeft_;
-
-	int patternDelay_ = -1;
-
-	int tick_;
-	int speed_;
-	int tempo_;
-	int posChanson_ = 0;
-	int posInPattern_;
-	boolean loopable_ = false;
-
-	boolean running_;
-	boolean done_ = false;
-
-	Timer timer_;
 }

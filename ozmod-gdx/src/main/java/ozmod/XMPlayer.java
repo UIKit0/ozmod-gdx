@@ -21,151 +21,263 @@ Contact the author: igor@tsarevitch.org
 
 package ozmod;
 
-import java.util.Arrays;
-import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-
-import javax.sound.sampled.*;
-
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.audio.AudioDevice;
-
-import ozmod.MODPlayer.Voice;
+import ozmod.SeekableBytes.Endian;
 
 /**
  * A Class to replay XM file.
  */
-public class XMPlayer extends Thread {
+public class XMPlayer extends OZModPlayer {
 
-	class NoteInfo {
-		int note;
-		int iInstru = -1;
-		int effect;
-		int effectOperand;
-		int colum;
-	}
-
-	class Column {
+	protected static class Column {
 		NoteInfo notesInfo[];
 	}
 
-	class Pattern {
-		int nbLines;
-		Column columns[];
+	protected static class Instru {
+
+		int endPanLoop;
+		int endVolLoop;
+		int envPan[] = new int[24];
+		int envVol[] = new int[24];
+		int fadeOut;
+		byte name[] = new byte[22];
+		int nbPointsPan;
+		int nbPointsVol;
+		int nbSamples;
+		int panType;
+		byte reserved[] = new byte[22];
+		Sample samples[];
+		int sampleTable[] = new int[96];
+		int startPanLoop;
+		int startVolLoop;
+		int sustainPointPan;
+		int sustainPointVol;
+		int type;
+		int vibratoProf;
+		int vibratoSpeed;
+		int vibratoSweep;
+		int vibratoType;
+
+		int volType;
 	}
 
-	class Sample {
+	protected static class NoteInfo {
+		int colum;
+		int effect;
+		int effectOperand;
+		int iInstru = -1;
+		int note;
+	}
 
-		byte name[] = new byte[22];
-		int len;
+	protected static class Pattern {
+		Column columns[];
+		int nbLines;
+	};
+
+	protected static class Sample {
+
+		AudioData audioData = new AudioData();
 		int fineTune;
-		int volume;
+		int len;
+		int lengthLoop;
+		byte name[] = new byte[22];
+		int offStop;
 		int panning;
 		byte relativeNote;
 		int startLoop;
-		int lengthLoop;
-		int offStop;
 		int type;
 
-		AudioData audioData = new AudioData();
+		int volume;
 	};
 
-	class Instru {
+	protected class Voice {
 
-		byte name[] = new byte[22];
-		int type;
-		int nbSamples;
-		int sampleTable[] = new int[96];
-		int envVol[] = new int[24];
-		int envPan[] = new int[24];
-		int nbPointsVol;
-		int nbPointsPan;
-		int sustainPointVol;
-		int startVolLoop;
-		int endVolLoop;
-		int sustainPointPan;
-		int startPanLoop;
-		int endPanLoop;
-		int volType;
-		int panType;
-		int vibratoType;
-		int vibratoSweep;
-		int vibratoProf;
-		int vibratoSpeed;
-		int fadeOut;
-		byte reserved[] = new byte[22];
-
-		Sample samples[];
-	};
-
-	class Voice {
-
-		int iVoice_;
-
-		int period_, dstPeriod_, periodBAK_;
-		int arpeggioCount_, arp1_, arp2_;
-		Sample listSamples_;
-		int note_, effect_, effectOperand_, effectOperand2_, oldEffect_ = -1;
-		int column_Effect_, column_EffectOperand_;
-		Sample samplePlaying_, sampleToPlay_;
 		Instru actuInstru_;
-		int actuNumInstru_ = -1;
-		boolean bNeedToBePlayed_;
 
-		int volumeSlidingSpeed_;
+		int actuNumInstru_ = -1;
+		int arpeggioCount_, arp1_, arp2_;
+		boolean bGotArpeggio_;
+		boolean bGotRetrigNote_;
+		boolean bGotTremolo_;
+		boolean bGotVibrato_;
+		boolean bKeyOFF_;
+		boolean bNeedToBePlayed_;
+		boolean bNoteCutted_;
+
+		int column_Effect_, column_EffectOperand_;
+		int column_FineVolumeUp_, column_FineVolumeDown_;
+
+		int column_PanSlidingSpeed_;
+		int column_PortamentoSpeed_;
 		int column_VolumeSlidingSpeed_;
 
-		int portamentoSpeed_;
-		int column_PortamentoSpeed_;
-		boolean bGotArpeggio_;
+		int envelopePanning_;
+		int envelopeVolume_;
+		int fadeOutVolume_;
+		int fineSlideSpeed_;
 
-		boolean bGotVibrato_;
+		int fineTune_;
+		int fineVolumeUp_, fineVolumeDown_;
+		int globalVolSlide_;
+		int iVoice_;
+
+		Sample listSamples_;
+
+		int note_, effect_, effectOperand_, effectOperand2_, oldEffect_ = -1;
+
+		int noteCut_;
+
+		int panEnvActuPoint_;
+		float panEnvActuPos_;
+
+		int panning_;
+		int period_, dstPeriod_, periodBAK_;
+		int portamentoSpeed_;
+		int portaSpeed_;
+		Sample samplePlaying_, sampleToPlay_;
+		int samplePosJump_;
+
+		Channel sndchan_;
+		int tickBeforeSample_;
+
+		int tickForRetrigNote_ = -1;
+		int tremoloCounter_;
+
+		int tremoloForm_;
+		int tremoloSpeed_, tremoloProf_;
 		int vibratoCounter_, vibratoCounter_s_;
 		int vibratoForm_;
 		int vibratoSpeed_, vibratoSpeed_s_, vibratoProf_, vibratoProf_s_;
 
-		boolean bGotTremolo_;
-		int tremoloCounter_;
-		int tremoloForm_;
-		int tremoloSpeed_, tremoloProf_;
-
-		int portaSpeed_;
-
-		int fineSlideSpeed_;
-
-		int column_PanSlidingSpeed_;
-
-		boolean bNoteCutted_;
-		int noteCut_;
-
-		int fineTune_;
-		int volume_, volumeBAK_;
-		int envelopeVolume_;
-		int fadeOutVolume_;
-		int panning_;
-		int envelopePanning_;
-
-		int tickBeforeSample_;
-		int samplePosJump_;
-
-		boolean bGotRetrigNote_;
-		int tickForRetrigNote_ = -1;
-
-		boolean bKeyOFF_;
-		float volEnvActuPos_;
 		int volEnvActuPoint_;
-		float panEnvActuPos_;
-		int panEnvActuPoint_;
+		float volEnvActuPos_;
+		int volume_, volumeBAK_;
 
-		int fineVolumeUp_, fineVolumeDown_;
-		int column_FineVolumeUp_, column_FineVolumeDown_;
-		int globalVolSlide_;
-
-		Channel sndchan_;
+		int volumeSlidingSpeed_;
 
 		Voice() {
 			sndchan_ = new Channel();
+		}
+
+		void panEnvelope() {
+			int x0, y0, x1, y1, actuY;
+			int envPan[];
+
+			if (actuInstru_ == null)
+				return;
+
+			if ((actuInstru_.panType & 1) == 0)
+				return;
+
+			if (tick_ < tickBeforeSample_)
+				return;
+
+			envPan = actuInstru_.envPan; // [panEnvActuPoint_];
+
+			boolean bAuthorize = true;
+
+			if (panEnvActuPoint_ == actuInstru_.nbPointsPan - 1) {
+				x1 = 1;
+				y0 = y1 = envPan[panEnvActuPoint_ * 2 + 1];
+			} else {
+				x1 = envPan[panEnvActuPoint_ * 2 + 2]
+						- envPan[panEnvActuPoint_ * 2];
+				y0 = envPan[panEnvActuPoint_ * 2 + 1];
+				y1 = envPan[panEnvActuPoint_ * 2 + 3];
+			}
+
+			if (x1 == 0) {
+				x1 = 1;
+				y1 = y0;
+			}
+
+			actuY = (int) ((float) ((y1 - y0) * panEnvActuPos_) / x1 + y0);
+
+			if ((actuInstru_.panType & 2) != 0) {
+				// Sustain point
+				if (panEnvActuPoint_ == actuInstru_.sustainPointPan
+						&& bKeyOFF_ == false)
+					bAuthorize = false;
+			}
+			if (bAuthorize == true)
+				panEnvActuPos_++;
+
+			if (panEnvActuPos_ >= x1) {
+				if ((actuInstru_.panType & 4) != 0) {
+					// Envelope Loop
+					if (panEnvActuPoint_ + 1 == actuInstru_.endPanLoop) {
+						panEnvActuPoint_ = actuInstru_.startPanLoop;
+					} else
+						panEnvActuPoint_++;
+					panEnvActuPos_ = 0;
+				} else {
+					if (panEnvActuPoint_ == actuInstru_.nbPointsPan - 2)
+						panEnvActuPos_ = x1;
+					else {
+						panEnvActuPoint_++;
+						panEnvActuPos_ = 0;
+					}
+				}
+			}
+			envelopePanning_ = actuY * 4;
+		}
+
+		void panSliding(int pan) {
+			panning_ += pan;
+		}
+
+		void portamentoTo(int speed) {
+			if (period_ < dstPeriod_) {
+				period_ += speed;
+				if (period_ > dstPeriod_)
+					period_ = dstPeriod_;
+			} else if (period_ > dstPeriod_) {
+				period_ -= speed;
+				if (period_ < dstPeriod_)
+					period_ = dstPeriod_;
+			}
+
+			periodBAK_ = period_;
+		}
+
+		void seekEnvelope(int pos) {
+			int i;
+
+			if (actuInstru_ == null)
+				return;
+
+			// Reseek volume
+			if ((actuInstru_.volType & 1) != 0) {
+				int nbPoints = actuInstru_.nbPointsVol;
+				if (pos >= actuInstru_.envVol[(nbPoints - 1) * 2]) {
+					volEnvActuPoint_ = nbPoints - 2;
+					volEnvActuPos_ = (float) actuInstru_.envVol[(nbPoints - 1) * 2]
+							- actuInstru_.envVol[(nbPoints - 2) * 2];
+					return;
+				}
+
+				i = 0;
+				while (actuInstru_.envVol[i * 2] < pos)
+					i++;
+				volEnvActuPoint_ = i - 1;
+				volEnvActuPos_ = (float) (pos - actuInstru_.envVol[(i - 1) * 2]);
+			}
+
+			// then Reseek panning
+			if ((actuInstru_.panType & 1) != 0) {
+				int nbPoints = actuInstru_.nbPointsPan;
+				if (pos >= actuInstru_.envPan[(nbPoints - 1) * 2]) {
+					panEnvActuPoint_ = nbPoints - 2;
+					panEnvActuPos_ = (float) actuInstru_.envPan[(nbPoints - 1) * 2]
+							- actuInstru_.envPan[(nbPoints - 2) * 2];
+					return;
+				}
+
+				i = 0;
+				while (actuInstru_.envPan[(++i) * 2] < pos)
+					;
+				panEnvActuPoint_ = i - 1;
+				panEnvActuPos_ = (float) (pos - actuInstru_.envPan[(i - 1) * 2]);
+			}
 		}
 
 		void soundUpdate() {
@@ -234,7 +346,7 @@ public class XMPlayer extends Thread {
 				sndchan_.setPan(pan);
 
 				sndchan_.frequency = freq;
-				sndchan_.step = freq / (float) freq_;
+				sndchan_.step = freq / (float) frequency_;
 				sndchan_.vol = vol;
 
 				return;
@@ -247,68 +359,22 @@ public class XMPlayer extends Thread {
 			} else
 				startPos = 0;
 
-			chans_.removeChannel(sndchan_);
+			chansList_.removeChannel(sndchan_);
 
 			if (tick_ >= tickBeforeSample_) {
 
 				sndchan_.audio = samplePlaying_.audioData;
 				sndchan_.frequency = freq;
-				sndchan_.step = freq / (float) freq_;
+				sndchan_.step = freq / (float) frequency_;
 				sndchan_.vol = vol;
 				sndchan_.setPan(pan);
 				sndchan_.pos = startPos;
-				chans_.addChannel(sndchan_);
+				chansList_.addChannel(sndchan_);
 
 				bNeedToBePlayed_ = false;
 				tickBeforeSample_ = 0;
 			}
 
-		}
-
-		void vibrato(boolean bSample, int form) {
-			int vibSeek;
-			int periodOffset;
-
-			if (bSample == false)
-				vibSeek = (vibratoCounter_ >> 2) & 0x3f;
-			else
-				vibSeek = (vibratoCounter_s_ >> 2) & 0x3f;
-
-			switch (form) {
-			case 0:
-			default:
-				periodOffset = TrackerConstant.vibratoTable[vibSeek];
-				break;
-			case 1:
-				periodOffset = TrackerConstant.squareTable[vibSeek];
-				break;
-			case 2:
-				periodOffset = (((vibSeek + 32) % 63) - 32) << 3;
-				break;
-			case 3:
-				periodOffset = (-((vibSeek + 32) % 63) + 32) << 3;
-				break;
-			}
-
-			if (bSample == false) {
-				periodOffset *= vibratoProf_;
-				periodOffset >>= 7;
-				periodOffset <<= 2;
-			} else {
-				periodOffset *= vibratoProf_s_ * actuInstru_.vibratoProf;
-				periodOffset >>= (14 + 8);
-			}
-
-			if (bSample == true
-					&& (bGotVibrato_ == true || bGotArpeggio_ == true))
-				period_ += periodOffset;
-			else
-				period_ = periodBAK_ + periodOffset;
-
-			if (bSample == false)
-				vibratoCounter_ += vibratoSpeed_;
-			else
-				vibratoCounter_s_ += vibratoSpeed_s_;
 		}
 
 		void tremolo() {
@@ -328,225 +394,6 @@ public class XMPlayer extends Thread {
 			volume_ = volumeBAK_ + volumeOffset;
 
 			tremoloCounter_ += tremoloSpeed_;
-		}
-
-		void portamentoTo(int speed) {
-			if (period_ < dstPeriod_) {
-				period_ += speed;
-				if (period_ > dstPeriod_)
-					period_ = dstPeriod_;
-			} else if (period_ > dstPeriod_) {
-				period_ -= speed;
-				if (period_ < dstPeriod_)
-					period_ = dstPeriod_;
-			}
-
-			periodBAK_ = period_;
-		}
-
-		void volumeSliding(int vol) {
-			volume_ += vol;
-			volumeBAK_ = volume_;
-		}
-
-		void panSliding(int pan) {
-			panning_ += pan;
-		}
-
-		void seekEnvelope(int pos) {
-			int i;
-
-			if (actuInstru_ == null)
-				return;
-
-			// Reseek volume
-			if ((actuInstru_.volType & 1) != 0) {
-				int nbPoints = actuInstru_.nbPointsVol;
-				if (pos >= actuInstru_.envVol[(nbPoints - 1) * 2]) {
-					volEnvActuPoint_ = nbPoints - 2;
-					volEnvActuPos_ = (float) actuInstru_.envVol[(nbPoints - 1) * 2]
-							- actuInstru_.envVol[(nbPoints - 2) * 2];
-					return;
-				}
-
-				i = 0;
-				while (actuInstru_.envVol[i * 2] < pos)
-					i++;
-				volEnvActuPoint_ = i - 1;
-				volEnvActuPos_ = (float) (pos - actuInstru_.envVol[(i - 1) * 2]);
-			}
-
-			// then Reseek panning
-			if ((actuInstru_.panType & 1) != 0) {
-				int nbPoints = actuInstru_.nbPointsPan;
-				if (pos >= actuInstru_.envPan[(nbPoints - 1) * 2]) {
-					panEnvActuPoint_ = nbPoints - 2;
-					panEnvActuPos_ = (float) actuInstru_.envPan[(nbPoints - 1) * 2]
-							- actuInstru_.envPan[(nbPoints - 2) * 2];
-					return;
-				}
-
-				i = 0;
-				while (actuInstru_.envPan[(++i) * 2] < pos)
-					;
-				panEnvActuPoint_ = i - 1;
-				panEnvActuPos_ = (float) (pos - actuInstru_.envPan[(i - 1) * 2]);
-			}
-		}
-
-		void volEnvelope() {
-			int x0, y0, x1, y1, actuY;
-			int envVol[];
-
-			if (actuInstru_ == null)
-				return;
-
-			if ((actuInstru_.volType & 1) == 0) {
-				if (bKeyOFF_ == true)
-					fadeOutVolume_ = 0;
-				return;
-			}
-
-			if (tick_ < tickBeforeSample_)
-				return;
-
-			boolean bAuthorize = true;
-
-			envVol = actuInstru_.envVol; // [volEnvActuPoint_];
-
-			if (volEnvActuPoint_ == actuInstru_.nbPointsVol - 1) {
-				x1 = 1;
-				y0 = y1 = envVol[1];
-				bAuthorize = false;
-			} else {
-				x1 = envVol[volEnvActuPoint_ * 2 + 2]
-						- envVol[volEnvActuPoint_ * 2];
-				y0 = envVol[volEnvActuPoint_ * 2 + 1];
-				y1 = envVol[volEnvActuPoint_ * 2 + 3];
-			}
-
-			if (x1 == 0) {
-				x1 = 1;
-				y1 = y0;
-			}
-
-			actuY = (int) ((float) ((y1 - y0) * volEnvActuPos_) / x1 + y0);
-
-			if ((actuInstru_.volType & 2) != 0) {
-				// Sustain point
-				if (volEnvActuPoint_ == actuInstru_.sustainPointVol
-						&& bKeyOFF_ == false)
-					bAuthorize = false;
-			}
-			if (bAuthorize == true)
-				volEnvActuPos_++;
-
-			if (volEnvActuPos_ >= x1) {
-				if ((actuInstru_.volType & 4) != 0) {
-					// Envelope Loop
-					if (volEnvActuPoint_ + 1 == actuInstru_.endVolLoop)
-						volEnvActuPoint_ = actuInstru_.startVolLoop;
-					else
-						volEnvActuPoint_++;
-					volEnvActuPos_ = 0;
-				} else {
-					if (volEnvActuPoint_ == actuInstru_.nbPointsVol - 2)
-						volEnvActuPos_ = x1;
-					else {
-						volEnvActuPoint_++;
-						volEnvActuPos_ = 0;
-					}
-				}
-			}
-			envelopeVolume_ = actuY;
-
-			if (bKeyOFF_ == true) {
-				fadeOutVolume_ -= actuInstru_.fadeOut * 2;
-				if (fadeOutVolume_ < 0)
-					fadeOutVolume_ = 0;
-			}
-		}
-
-		void panEnvelope() {
-			int x0, y0, x1, y1, actuY;
-			int envPan[];
-
-			if (actuInstru_ == null)
-				return;
-
-			if ((actuInstru_.panType & 1) == 0)
-				return;
-
-			if (tick_ < tickBeforeSample_)
-				return;
-
-			envPan = actuInstru_.envPan; // [panEnvActuPoint_];
-
-			boolean bAuthorize = true;
-
-			if (panEnvActuPoint_ == actuInstru_.nbPointsPan - 1) {
-				x1 = 1;
-				y0 = y1 = envPan[panEnvActuPoint_ * 2 + 1];
-			} else {
-				x1 = envPan[panEnvActuPoint_ * 2 + 2]
-						- envPan[panEnvActuPoint_ * 2];
-				y0 = envPan[panEnvActuPoint_ * 2 + 1];
-				y1 = envPan[panEnvActuPoint_ * 2 + 3];
-			}
-
-			if (x1 == 0) {
-				x1 = 1;
-				y1 = y0;
-			}
-
-			actuY = (int) ((float) ((y1 - y0) * panEnvActuPos_) / x1 + y0);
-
-			if ((actuInstru_.panType & 2) != 0) {
-				// Sustain point
-				if (panEnvActuPoint_ == actuInstru_.sustainPointPan
-						&& bKeyOFF_ == false)
-					bAuthorize = false;
-			}
-			if (bAuthorize == true)
-				panEnvActuPos_++;
-
-			if (panEnvActuPos_ >= x1) {
-				if ((actuInstru_.panType & 4) != 0) {
-					// Envelope Loop
-					if (panEnvActuPoint_ + 1 == actuInstru_.endPanLoop) {
-						panEnvActuPoint_ = actuInstru_.startPanLoop;
-					} else
-						panEnvActuPoint_++;
-					panEnvActuPos_ = 0;
-				} else {
-					if (panEnvActuPoint_ == actuInstru_.nbPointsPan - 2)
-						panEnvActuPos_ = x1;
-					else {
-						panEnvActuPoint_++;
-						panEnvActuPos_ = 0;
-					}
-				}
-			}
-			envelopePanning_ = actuY * 4;
-		}
-
-		void updateSoundWithEnvelope() {
-			if (actuInstru_ == null)
-				return;
-
-			if (actuInstru_.vibratoProf != 0 && actuInstru_.vibratoSpeed != 0) {
-				if (actuInstru_.vibratoSweep != 0)
-					vibratoProf_s_ += (64 << 8) / actuInstru_.vibratoSweep;
-				else
-					vibratoProf_s_ += 64 << 8;
-				if (vibratoProf_s_ > 256 * 64)
-					vibratoProf_s_ = 256 * 64;
-				vibratoSpeed_s_ = actuInstru_.vibratoSpeed;
-				vibrato(true, actuInstru_.vibratoType);
-			}
-
-			volEnvelope();
-			panEnvelope();
 		}
 
 		void updateSoundWithEffect() {
@@ -642,445 +489,189 @@ public class XMPlayer extends Thread {
 			}
 		}
 
-	}
+		void updateSoundWithEnvelope() {
+			if (actuInstru_ == null)
+				return;
 
-	public XMPlayer() {
-	}
+			if (actuInstru_.vibratoProf != 0 && actuInstru_.vibratoSpeed != 0) {
+				if (actuInstru_.vibratoSweep != 0)
+					vibratoProf_s_ += (64 << 8) / actuInstru_.vibratoSweep;
+				else
+					vibratoProf_s_ += 64 << 8;
+				if (vibratoProf_s_ > 256 * 64)
+					vibratoProf_s_ = 256 * 64;
+				vibratoSpeed_s_ = actuInstru_.vibratoSpeed;
+				vibrato(true, actuInstru_.vibratoType);
+			}
 
-	protected void finalize() {
-		running_ = false;
-	}
-
-	/**
-	 * Loads the XM.
-	 * 
-	 * @param _input
-	 *            An instance to a PipeIn Class to read data from disk or URL.
-	 * @return NOERR if no error occured.
-	 */
-	public OZMod.ERR load(PipeIn _input) {
-		byte tmp[] = new byte[20];
-		int lseek;
-
-		_input.readContent();
-
-		_input.read(tmp, 0, 17);
-		String ID = new String(tmp).substring(0, 17);
-		if (ID.compareTo("Extended Module: ") != 0)
-			return OZMod.proceedError(OZMod.ERR.BADFORMAT);
-
-		_input.readFully(songName_);
-		_input.seek(38);
-		_input.read(trackerName_, 0, 20);
-		version_ = _input.readUShort();
-		lseek = _input.tell();
-
-		sizHeaderInfo_ = _input.readInt();
-		listLen_ = _input.readUShort();
-		posRestart_ = _input.readUShort();
-		nbVoices_ = _input.readUShort();
-		if (nbVoices_ > 64)
-			return OZMod.proceedError(OZMod.ERR.BADFORMAT);
-
-		nbPatterns_ = _input.readUShort();
-		nbInstrus_ = _input.readUShort();
-		freqFlag_ = _input.readUShort();
-		speed_ = _input.readUShort();
-		BPM_ = _input.readUShort();
-
-		// don't trust on nbPatterns_, always read 256 bytes!
-		for (int i = 0; i < 256; i++)
-			// for (int i = 0; i < nbPatterns_; i++)
-			listPatterns_[i] = _input.readUByte();
-
-		voices_ = new Voice[nbVoices_];
-		for (int i = 0; i < nbVoices_; i++) {
-			Voice voice = new Voice();
-			voices_[i] = voice;
-			voice.iVoice_ = i;
+			volEnvelope();
+			panEnvelope();
 		}
 
-		_input.seek(lseek + sizHeaderInfo_);
+		void vibrato(boolean bSample, int form) {
+			int vibSeek;
+			int periodOffset;
 
-		// Patterns
-		patterns_ = new Pattern[nbPatterns_];
-		for (int i = 0; i < nbPatterns_; i++) {
-			Pattern pat = new Pattern();
-			patterns_[i] = pat;
+			if (bSample == false)
+				vibSeek = (vibratoCounter_ >> 2) & 0x3f;
+			else
+				vibSeek = (vibratoCounter_s_ >> 2) & 0x3f;
 
-			int headerSize;
-			int patternCompression;
-			int comp;
-
-			headerSize = _input.readInt();
-			patternCompression = _input.readUByte();
-			pat.nbLines = _input.readUShort();
-			comp = _input.readUShort();
-
-			pat.columns = new Column[nbVoices_];
-			for (int j = 0; j < nbVoices_; j++) {
-				Column column = new Column();
-				pat.columns[j] = column;
-				column.notesInfo = new NoteInfo[pat.nbLines];
-				for (int k = 0; k < pat.nbLines; k++)
-					column.notesInfo[k] = new NoteInfo();
+			switch (form) {
+			case 0:
+			default:
+				periodOffset = TrackerConstant.vibratoTable[vibSeek];
+				break;
+			case 1:
+				periodOffset = TrackerConstant.squareTable[vibSeek];
+				break;
+			case 2:
+				periodOffset = (((vibSeek + 32) % 63) - 32) << 3;
+				break;
+			case 3:
+				periodOffset = (-((vibSeek + 32) % 63) + 32) << 3;
+				break;
 			}
 
-			if (comp == 0)
-				continue;
-
-			for (int j = 0; j < pat.nbLines; j++) {
-				for (int k = 0; k < nbVoices_; k++) {
-					int dat;
-					dat = _input.readUByte();
-
-					NoteInfo noteInfo = pat.columns[k].notesInfo[j];
-
-					if ((dat & 0x80) != 0) {
-						// packed info
-						if ((dat & 1) != 0)
-							noteInfo.note = _input.readUByte();
-
-						if ((dat & 2) != 0) {
-							noteInfo.iInstru = _input.readUByte();
-							noteInfo.iInstru--;
-						}
-
-						if ((dat & 4) != 0)
-							noteInfo.colum = _input.readUByte();
-
-						if ((dat & 8) != 0)
-							noteInfo.effect = _input.readUByte();
-
-						if ((dat & 16) != 0)
-							noteInfo.effectOperand = _input.readUByte();
-					} else {
-						noteInfo.note = dat;
-						noteInfo.iInstru = _input.readUByte();
-						noteInfo.iInstru--;
-						noteInfo.colum = _input.readUByte();
-						noteInfo.effect = _input.readUByte();
-						noteInfo.effectOperand = _input.readUByte();
-					}
-				}
+			if (bSample == false) {
+				periodOffset *= vibratoProf_;
+				periodOffset >>= 7;
+				periodOffset <<= 2;
+			} else {
+				periodOffset *= vibratoProf_s_ * actuInstru_.vibratoProf;
+				periodOffset >>= (14 + 8);
 			}
+
+			if (bSample == true
+					&& (bGotVibrato_ == true || bGotArpeggio_ == true))
+				period_ += periodOffset;
+			else
+				period_ = periodBAK_ + periodOffset;
+
+			if (bSample == false)
+				vibratoCounter_ += vibratoSpeed_;
+			else
+				vibratoCounter_s_ += vibratoSpeed_s_;
 		}
 
-		// Check for unexisting pattern
-		for (int i = 0; i < listLen_; i++) {
-			int iPat = listPatterns_[i];
-			if (patterns_[iPat] == null) {
-				Pattern pat = new Pattern();
-				patterns_[i] = pat;
-				pat.nbLines = 64;
-				pat.columns = new Column[nbVoices_];
-				for (int j = 0; j < nbVoices_; j++) {
-					Column column = new Column();
-					pat.columns[j] = column;
-					column.notesInfo = new NoteInfo[pat.nbLines];
-					for (int k = 0; k < pat.nbLines; k++)
-						column.notesInfo[k] = new NoteInfo();
-				}
-			}
-		}
+		void volEnvelope() {
+			int x0, y0, x1, y1, actuY;
+			int envVol[];
 
-		// Instruments
-		instrus_ = new Instru[nbInstrus_];
-		for (int i = 0; i < nbInstrus_; i++) {
-			Instru instru = new Instru();
-			instrus_[i] = instru;
+			if (actuInstru_ == null)
+				return;
 
-			int headerSize;
-			int extra_size;
-			headerSize = _input.readInt();
-			lseek = _input.tell();
-			_input.read(instru.name, 0, 22);
-			instru.type = _input.readUByte();
-			instru.nbSamples = _input.readUShort();
-
-			if ((instru.nbSamples == 0) || (instru.nbSamples > 255)) {
-				_input.forward(headerSize - 29);
-				continue;
+			if ((actuInstru_.volType & 1) == 0) {
+				if (bKeyOFF_ == true)
+					fadeOutVolume_ = 0;
+				return;
 			}
 
-			extra_size = _input.readInt();
-			for (int j = 0; j < 96; j++)
-				instru.sampleTable[j] = _input.readUByte();
+			if (tick_ < tickBeforeSample_)
+				return;
 
-			for (int j = 0; j < 24; j++)
-				instru.envVol[j] = _input.readUShort();
+			boolean bAuthorize = true;
 
-			for (int j = 0; j < 24; j++)
-				instru.envPan[j] = _input.readUShort();
+			envVol = actuInstru_.envVol; // [volEnvActuPoint_];
 
-			instru.nbPointsVol = _input.readUByte();
-			instru.nbPointsPan = _input.readUByte();
-			instru.sustainPointVol = _input.readUByte();
-			instru.startVolLoop = _input.readUByte();
-			instru.endVolLoop = _input.readUByte();
-			instru.sustainPointPan = _input.readUByte();
-			instru.startPanLoop = _input.readUByte();
-			instru.endPanLoop = _input.readUByte();
-			instru.volType = _input.readUByte();
-			instru.panType = _input.readUByte();
-			instru.vibratoType = _input.readUByte();
-			instru.vibratoSweep = _input.readUByte();
-			instru.vibratoProf = _input.readUByte();
-			instru.vibratoSpeed = _input.readUByte();
-			instru.fadeOut = _input.readUShort();
-			_input.read(instru.reserved, 0, 11 * 2);
-
-			// Inside the instruments, dispatch samples info
-			instru.samples = new Sample[instru.nbSamples];
-			for (int j = 0; j < instru.nbSamples; j++) {
-				Sample sample = new Sample();
-				instru.samples[j] = sample;
-
-				sample.len = _input.readInt();
-				sample.startLoop = _input.readInt();
-				sample.lengthLoop = _input.readInt();
-				sample.volume = _input.readUByte();
-				sample.fineTune = _input.readByte();
-				sample.type = _input.readUByte();
-				sample.panning = _input.readUByte();
-				sample.relativeNote = _input.readByte();
-				_input.forward(1);
-				_input.read(sample.name, 0, 22);
-				_input.forward(extra_size - 40);
+			if (volEnvActuPoint_ == actuInstru_.nbPointsVol - 1) {
+				x1 = 1;
+				y0 = y1 = envVol[1];
+				bAuthorize = false;
+			} else {
+				x1 = envVol[volEnvActuPoint_ * 2 + 2]
+						- envVol[volEnvActuPoint_ * 2];
+				y0 = envVol[volEnvActuPoint_ * 2 + 1];
+				y1 = envVol[volEnvActuPoint_ * 2 + 3];
 			}
 
-			// and in a second pass _input.read the audio data (XM format really
-			// sucks!!)
-			for (int j = 0; j < instru.nbSamples; j++) {
-				Sample sample = instru.samples[j];
-				if (sample.len == 0)
-					continue;
+			if (x1 == 0) {
+				x1 = 1;
+				y1 = y0;
+			}
 
-				byte dat[] = new byte[sample.len];
-				_input.read(dat, 0, sample.len);
+			actuY = (int) ((float) ((y1 - y0) * volEnvActuPos_) / x1 + y0);
 
-				// samples are stored as delta value, recompose them as absolute
-				// integer
-				int nbBits = 0;
-				if ((sample.type & 16) != 0) {
-					// 16 bits
-					nbBits = 16;
-					int old = 0;
-					for (int ii = 2; ii < dat.length; ii += 2) {
-						int b1 = (int) (dat[ii] & 0xff);
-						int b2 = (int) (dat[ii + 1]);
-						int n = b1 | (b2 << 8);
+			if ((actuInstru_.volType & 2) != 0) {
+				// Sustain point
+				if (volEnvActuPoint_ == actuInstru_.sustainPointVol
+						&& bKeyOFF_ == false)
+					bAuthorize = false;
+			}
+			if (bAuthorize == true)
+				volEnvActuPos_++;
 
-						n += old;
-						dat[ii] = (byte) (n & 0xff);
-						dat[ii + 1] = (byte) ((n >> 8) & 0xff);
-
-						old = n;
-					}
+			if (volEnvActuPos_ >= x1) {
+				if ((actuInstru_.volType & 4) != 0) {
+					// Envelope Loop
+					if (volEnvActuPoint_ + 1 == actuInstru_.endVolLoop)
+						volEnvActuPoint_ = actuInstru_.startVolLoop;
+					else
+						volEnvActuPoint_++;
+					volEnvActuPos_ = 0;
 				} else {
-					// 8 bits
-					nbBits = 8;
-					int old = 0;
-					for (int ii = 0; ii < dat.length; ii++) {
-						int n = dat[ii] + old;
-						dat[ii] = (byte) n;
-						old = n;
+					if (volEnvActuPoint_ == actuInstru_.nbPointsVol - 2)
+						volEnvActuPos_ = x1;
+					else {
+						volEnvActuPoint_++;
+						volEnvActuPos_ = 0;
 					}
 				}
-
-				if ((sample.type & 3) == 1) {
-					// forward loop
-					sample.audioData
-							.make(dat,
-									nbBits,
-									1,
-									(sample.startLoop) >> (nbBits / 16),
-									(sample.startLoop + sample.lengthLoop) >> (nbBits / 16),
-									AudioData.LOOP_FORWARD);
-				} else if (((sample.type & 3) == 2) || ((sample.type & 3) == 3)) {
-					// pingpong loop
-					sample.audioData
-							.make(dat,
-									nbBits,
-									1,
-									(sample.startLoop) >> (nbBits / 16),
-									(sample.startLoop + sample.lengthLoop) >> (nbBits / 16),
-									AudioData.LOOP_PINGPONG);
-				} else
-					sample.audioData.make(dat, nbBits, 1);
 			}
-		} // Next instrument
+			envelopeVolume_ = actuY;
 
-		return OZMod.proceedError(OZMod.ERR.NOERR);
-	}
-
-	/**
-	 * Starts to play the XM. The time latency between a note is read and then
-	 * heard is approximatively of 100ms. If the XM is not loopable and finish,
-	 * you cannot restart it by invoking again this method.
-	 */
-	public void play() {
-		if (isAlive() == true || done_ == true)
-			return;
-
-		timer_ = new Timer();
-		tick_ = 0;
-		patternDelay_ = -1;
-
-		running_ = true;
-
-		start();
-	}
-
-	/**
-	 * Stops the XM. Once a XM is stopped, it cannot be restarted.
-	 */
-	public void done() {
-		running_ = false;
-		try {
-			join();
-		} catch (InterruptedException e) {
-		}
-	}
-
-	private AudioDevice gdxAudio;
-
-	/**
-	 * Never call this method directly. Use play() instead.
-	 */
-	public void run() {
-		freq_ = 44100;
-		gdxAudio = Gdx.audio.newAudioDevice(freq_, false);
-		gdxAudio.setVolume(1f);
-
-		int soundBufferLen = freq_ * 4;
-		pcm_ = new byte[soundBufferLen];
-		pcms_ = new short[pcm_.length / 2];
-
-		long cumulTime = 0;
-
-		while (running_) {
-			long since = timer_.getDelta();
-			
-			float timerRate = 1000.0f / (BPM_ * 0.4f);
-			int intTimerRate = (int) Math.floor(timerRate);
-			
-			cumulTime += since;
-
-			while (cumulTime >= intTimerRate) {
-				cumulTime -= intTimerRate;
-				oneShot(intTimerRate);
+			if (bKeyOFF_ == true) {
+				fadeOutVolume_ -= actuInstru_.fadeOut * 2;
+				if (fadeOutVolume_ < 0)
+					fadeOutVolume_ = 0;
 			}
-			doSleep((intTimerRate - cumulTime)-100);
-		}
-		done_ = true;
-		System.out.println("Done.");
-	}
-
-	private void doSleep(long ms) {
-		if (ms < 0) {
-			return;
-		}
-		try {
-			Thread.sleep(ms);
-		} catch (InterruptedException e) {
-		}
-	}
-
-	void oneShot(int _timer) {
-		if (tick_ == speed_)
-			tick_ = 0;
-		tick_++;
-
-		if (tick_ == 1) {
-			patternDelay_--;
-			if (patternDelay_ < 0)
-				dispatchNotes();
-		} else {
-			for (int i = 0; i < nbVoices_; i++)
-				voices_[i].updateSoundWithEffect();
 		}
 
-		for (int i = 0; i < nbVoices_; i++)
-			voices_[i].updateSoundWithEnvelope();
-
-		for (int i = 0; i < nbVoices_; i++)
-			voices_[i].soundUpdate();
-
-		mixSample(_timer);
-	}
-
-	void mixSample(int _time) {
-		int nbsamp = freq_ / (1000 / _time);
-		Arrays.fill(pcm_, (byte) 0);
-		chans_.mix(nbsamp, pcm_);
-		// line_.write(pcm_, 0, nbsamp * 4);
-		ByteBuffer.wrap(pcm_).order(ByteOrder.BIG_ENDIAN).asShortBuffer()
-				.get(pcms_, 0, nbsamp * 2);
-		gdxAudio.writeSamples(pcms_, 0, nbsamp * 2);
-	}
-
-	int getFreq(int period) {
-		int okt;
-		int frequency;
-
-		period = 11520 - period;
-		okt = period / 768 - 3;
-		frequency = TrackerConstant.lintab[period % 768];
-
-		if (okt < 8)
-			frequency = frequency >> (7 - okt);
-		else {
-			frequency = frequency << (okt - 7);
+		void volumeSliding(int vol) {
+			volume_ += vol;
+			volumeBAK_ = volume_;
 		}
 
-		return frequency;
 	}
 
-	int interpolate(int p, int p1, int p2, int v1, int v2) {
-		int dp, dv, di;
-
-		if (p1 == p2)
-			return v1;
-
-		dv = v2 - v1;
-		dp = p2 - p1;
-		di = p - p1;
-
-		return v1 + ((int) (di * dv) / dp);
+	protected static final int COLUMN_EFFECT_NONE = 0x0fff;
+	protected static final int COLUMN_EFFECT_PANSLIDE = 0x02;
+	protected static final int COLUMN_EFFECT_PORTAMENTO_TO = 0x03;
+	protected static final int COLUMN_EFFECT_VOLUMESLIDE = 0x01;
+	protected static final int MAX_PERIOD = 11520;
+	protected static final int MAXNBPATTERNS = 256;
+	protected static final int MAXNBSONGPAT = 256;
+	protected static final int MAXNBVOICES = 64;
+	protected static final int MIN_PERIOD = 40;
+	protected boolean bGotPatternLoop_;
+	protected int BPM_ = 125;
+	protected int freqFlag_;
+	protected int globalVolume_ = 64;
+	protected Instru instrus_[];
+	protected int listLen_;
+	protected int listPatterns_[] = new int[256];
+	protected float mainVolume_ = 1.0f;
+	protected int nbInstrus_;
+	protected int nbPatterns_;
+	protected int nbVoices_;
+	protected int patternDelay_ = -1;
+	protected int patternLoopLeft_;
+	protected int patternPosLoop_;
+	protected Pattern patterns_[];
+	protected int posChanson_ = 0;
+	protected int posInPattern_;
+	protected int posRestart_;
+	protected int sizHeaderInfo_;
+	protected byte songName_[] = new byte[20];
+	protected byte trackerName_[] = new byte[20];
+	protected int version_;
+	protected Voice voices_[];
+	public XMPlayer(IAudioDevice audioDevice) {
+		super(audioDevice);
+		speed_ = 6;
 	}
-
-	int getLinearPeriod(int note, int fine) {
-		return ((10 * 12 * 16 * 4) - ((int) note * 16 * 4) - (fine / 2) + 64);
-	}
-
-	int getLogPeriod(int note, int fine) {
-		int n, o;
-		int p1, p2, i;
-
-		// fine+=128;
-		n = note % 12;
-		o = note / 12;
-		i = (n << 3) + (fine >> 4); // n*8 + fine/16
-		if (i < 0)
-			i = 0;
-
-		p1 = TrackerConstant.logtab[i];
-		p2 = TrackerConstant.logtab[i + 1];
-
-		return (interpolate(fine / 16, 0, 15, p1, p2) >> o);
-	}
-
-	int getPeriod(int note, int fine) {
-		int period;
-		if (freqFlag_ != 0)
-			period = getLinearPeriod(note, fine);
-		else
-			period = getLogPeriod(note, fine);
-		return period;
-	}
-
-	void dispatchNotes() {
+	@Override
+	protected void dispatchNotes() {
 		int iInstru, iSample;
 		int frequency;
 		int note, effect, effectOperand_, colum, effectOperand2_;
@@ -1561,7 +1152,7 @@ public class XMPlayer extends Thread {
 					if (posRestart_ == 0) {
 						globalVolume_ = 64;
 						for (int i = 0; i < nbVoices_; i++) {
-							chans_.removeChannel(voices_[i].sndchan_);
+							chansList_.removeChannel(voices_[i].sndchan_);
 							voices_[i].actuInstru_ = null;
 							voices_[i].samplePlaying_ = null;
 						}
@@ -1576,6 +1167,57 @@ public class XMPlayer extends Thread {
 	}
 
 	/**
+	 * Gets the current reading position of the song.
+	 * 
+	 * @return The current position.
+	 */
+	public int getCurrentPos() {
+		return posInPattern_;
+	}
+	/**
+	 * Gets the current reading row of the song.
+	 * 
+	 * @return The current row.
+	 */
+	public int getCurrentRow() {
+		return posChanson_;
+	}
+	protected int getFreq(int period) {
+		int okt;
+		int frequency;
+
+		period = 11520 - period;
+		okt = period / 768 - 3;
+		frequency = TrackerConstant.lintab[period % 768];
+
+		if (okt < 8)
+			frequency = frequency >> (7 - okt);
+		else {
+			frequency = frequency << (okt - 7);
+		}
+
+		return frequency;
+	}
+	protected int getLinearPeriod(int note, int fine) {
+		return ((10 * 12 * 16 * 4) - ((int) note * 16 * 4) - (fine / 2) + 64);
+	}
+	protected int getLogPeriod(int note, int fine) {
+		int n, o;
+		int p1, p2, i;
+
+		// fine+=128;
+		n = note % 12;
+		o = note / 12;
+		i = (n << 3) + (fine >> 4); // n*8 + fine/16
+		if (i < 0)
+			i = 0;
+
+		p1 = TrackerConstant.logtab[i];
+		p2 = TrackerConstant.logtab[i + 1];
+
+		return (interpolate(fine / 16, 0, 15, p1, p2) >> o);
+	}
+	/**
 	 * Gets the internal buffer used to mix the samples together. It can be used
 	 * for instance to analyze the wave, apply effect or whatever.
 	 * 
@@ -1585,6 +1227,26 @@ public class XMPlayer extends Thread {
 		return pcm_;
 	}
 
+	protected int getPeriod(int note, int fine) {
+		int period;
+		if (freqFlag_ != 0)
+			period = getLinearPeriod(note, fine);
+		else
+			period = getLogPeriod(note, fine);
+		return period;
+	}
+	protected int interpolate(int p, int p1, int p2, int v1, int v2) {
+		int dp, dv, di;
+
+		if (p1 == p2)
+			return v1;
+
+		dv = v2 - v1;
+		dp = p2 - p1;
+		di = p - p1;
+
+		return v1 + ((int) (di * dv) / dp);
+	}
 	/**
 	 * Tells if the XM is loopable or not.
 	 * 
@@ -1595,6 +1257,337 @@ public class XMPlayer extends Thread {
 	}
 
 	/**
+	 * Loads the XM.
+	 * 
+	 * @param _input
+	 *            An instance to a PipeIn Class to read data from disk or URL.
+	 * @return NOERR if no error occured.
+	 */
+	public void load(byte[] bytes) {
+		SeekableBytes _input=new SeekableBytes(bytes, Endian.BIGENDIAN);
+		byte tmp[] = new byte[20];
+		int lseek;
+
+		_input.read(tmp, 0, 17);
+		String ID = new String(tmp).substring(0, 17);
+		if (ID.compareTo("Extended Module: ") != 0)
+			throw new OZModRuntimeError(OZMod.ERR.BADFORMAT);
+
+		_input.readFully(songName_);
+		_input.seek(38);
+		_input.read(trackerName_, 0, 20);
+		version_ = _input.readUShort();
+		lseek = _input.tell();
+
+		sizHeaderInfo_ = _input.readInt();
+		listLen_ = _input.readUShort();
+		posRestart_ = _input.readUShort();
+		nbVoices_ = _input.readUShort();
+		if (nbVoices_ > 64)
+			throw new OZModRuntimeError(OZMod.ERR.BADFORMAT);
+
+		nbPatterns_ = _input.readUShort();
+		nbInstrus_ = _input.readUShort();
+		freqFlag_ = _input.readUShort();
+		speed_ = _input.readUShort();
+		BPM_ = _input.readUShort();
+
+		// don't trust on nbPatterns_, always read 256 bytes!
+		for (int i = 0; i < 256; i++)
+			// for (int i = 0; i < nbPatterns_; i++)
+			listPatterns_[i] = _input.readUByte();
+
+		voices_ = new Voice[nbVoices_];
+		for (int i = 0; i < nbVoices_; i++) {
+			Voice voice = new Voice();
+			voices_[i] = voice;
+			voice.iVoice_ = i;
+		}
+
+		_input.seek(lseek + sizHeaderInfo_);
+
+		// Patterns
+		patterns_ = new Pattern[nbPatterns_];
+		for (int i = 0; i < nbPatterns_; i++) {
+			Pattern pat = new Pattern();
+			patterns_[i] = pat;
+
+			int headerSize;
+			int patternCompression;
+			int comp;
+
+			headerSize = _input.readInt();
+			patternCompression = _input.readUByte();
+			pat.nbLines = _input.readUShort();
+			comp = _input.readUShort();
+
+			pat.columns = new Column[nbVoices_];
+			for (int j = 0; j < nbVoices_; j++) {
+				Column column = new Column();
+				pat.columns[j] = column;
+				column.notesInfo = new NoteInfo[pat.nbLines];
+				for (int k = 0; k < pat.nbLines; k++)
+					column.notesInfo[k] = new NoteInfo();
+			}
+
+			if (comp == 0)
+				continue;
+
+			for (int j = 0; j < pat.nbLines; j++) {
+				for (int k = 0; k < nbVoices_; k++) {
+					int dat;
+					dat = _input.readUByte();
+
+					NoteInfo noteInfo = pat.columns[k].notesInfo[j];
+
+					if ((dat & 0x80) != 0) {
+						// packed info
+						if ((dat & 1) != 0)
+							noteInfo.note = _input.readUByte();
+
+						if ((dat & 2) != 0) {
+							noteInfo.iInstru = _input.readUByte();
+							noteInfo.iInstru--;
+						}
+
+						if ((dat & 4) != 0)
+							noteInfo.colum = _input.readUByte();
+
+						if ((dat & 8) != 0)
+							noteInfo.effect = _input.readUByte();
+
+						if ((dat & 16) != 0)
+							noteInfo.effectOperand = _input.readUByte();
+					} else {
+						noteInfo.note = dat;
+						noteInfo.iInstru = _input.readUByte();
+						noteInfo.iInstru--;
+						noteInfo.colum = _input.readUByte();
+						noteInfo.effect = _input.readUByte();
+						noteInfo.effectOperand = _input.readUByte();
+					}
+				}
+			}
+		}
+
+		// Check for unexisting pattern
+		for (int i = 0; i < listLen_; i++) {
+			int iPat = listPatterns_[i];
+			if (patterns_[iPat] == null) {
+				Pattern pat = new Pattern();
+				patterns_[i] = pat;
+				pat.nbLines = 64;
+				pat.columns = new Column[nbVoices_];
+				for (int j = 0; j < nbVoices_; j++) {
+					Column column = new Column();
+					pat.columns[j] = column;
+					column.notesInfo = new NoteInfo[pat.nbLines];
+					for (int k = 0; k < pat.nbLines; k++)
+						column.notesInfo[k] = new NoteInfo();
+				}
+			}
+		}
+
+		// Instruments
+		instrus_ = new Instru[nbInstrus_];
+		for (int i = 0; i < nbInstrus_; i++) {
+			Instru instru = new Instru();
+			instrus_[i] = instru;
+
+			int headerSize;
+			int extra_size;
+			headerSize = _input.readInt();
+			lseek = _input.tell();
+			_input.read(instru.name, 0, 22);
+			instru.type = _input.readUByte();
+			instru.nbSamples = _input.readUShort();
+
+			if ((instru.nbSamples == 0) || (instru.nbSamples > 255)) {
+				_input.forward(headerSize - 29);
+				continue;
+			}
+
+			extra_size = _input.readInt();
+			for (int j = 0; j < 96; j++)
+				instru.sampleTable[j] = _input.readUByte();
+
+			for (int j = 0; j < 24; j++)
+				instru.envVol[j] = _input.readUShort();
+
+			for (int j = 0; j < 24; j++)
+				instru.envPan[j] = _input.readUShort();
+
+			instru.nbPointsVol = _input.readUByte();
+			instru.nbPointsPan = _input.readUByte();
+			instru.sustainPointVol = _input.readUByte();
+			instru.startVolLoop = _input.readUByte();
+			instru.endVolLoop = _input.readUByte();
+			instru.sustainPointPan = _input.readUByte();
+			instru.startPanLoop = _input.readUByte();
+			instru.endPanLoop = _input.readUByte();
+			instru.volType = _input.readUByte();
+			instru.panType = _input.readUByte();
+			instru.vibratoType = _input.readUByte();
+			instru.vibratoSweep = _input.readUByte();
+			instru.vibratoProf = _input.readUByte();
+			instru.vibratoSpeed = _input.readUByte();
+			instru.fadeOut = _input.readUShort();
+			_input.read(instru.reserved, 0, 11 * 2);
+
+			// Inside the instruments, dispatch samples info
+			instru.samples = new Sample[instru.nbSamples];
+			for (int j = 0; j < instru.nbSamples; j++) {
+				Sample sample = new Sample();
+				instru.samples[j] = sample;
+
+				sample.len = _input.readInt();
+				sample.startLoop = _input.readInt();
+				sample.lengthLoop = _input.readInt();
+				sample.volume = _input.readUByte();
+				sample.fineTune = _input.readByte();
+				sample.type = _input.readUByte();
+				sample.panning = _input.readUByte();
+				sample.relativeNote = _input.readByte();
+				_input.forward(1);
+				_input.read(sample.name, 0, 22);
+				_input.forward(extra_size - 40);
+			}
+
+			// and in a second pass _input.read the audio data (XM format really
+			// sucks!!)
+			for (int j = 0; j < instru.nbSamples; j++) {
+				Sample sample = instru.samples[j];
+				if (sample.len == 0)
+					continue;
+
+				byte dat[] = new byte[sample.len];
+				_input.read(dat, 0, sample.len);
+
+				// samples are stored as delta value, recompose them as absolute
+				// integer
+				int nbBits = 0;
+				if ((sample.type & 16) != 0) {
+					// 16 bits
+					nbBits = 16;
+					int old = 0;
+					for (int ii = 2; ii < dat.length; ii += 2) {
+						int b1 = (int) (dat[ii] & 0xff);
+						int b2 = (int) (dat[ii + 1]);
+						int n = b1 | (b2 << 8);
+
+						n += old;
+						dat[ii] = (byte) (n & 0xff);
+						dat[ii + 1] = (byte) ((n >> 8) & 0xff);
+
+						old = n;
+					}
+				} else {
+					// 8 bits
+					nbBits = 8;
+					int old = 0;
+					for (int ii = 0; ii < dat.length; ii++) {
+						int n = dat[ii] + old;
+						dat[ii] = (byte) n;
+						old = n;
+					}
+				}
+
+				if ((sample.type & 3) == 1) {
+					// forward loop
+					sample.audioData
+							.make(dat,
+									nbBits,
+									1,
+									(sample.startLoop) >> (nbBits / 16),
+									(sample.startLoop + sample.lengthLoop) >> (nbBits / 16),
+									AudioData.LOOP_FORWARD);
+				} else if (((sample.type & 3) == 2) || ((sample.type & 3) == 3)) {
+					// pingpong loop
+					sample.audioData
+							.make(dat,
+									nbBits,
+									1,
+									(sample.startLoop) >> (nbBits / 16),
+									(sample.startLoop + sample.lengthLoop) >> (nbBits / 16),
+									AudioData.LOOP_PINGPONG);
+				} else
+					sample.audioData.make(dat, nbBits, 1);
+			}
+		} // Next instrument
+	}
+	protected void oneShot(int _timer) {
+		if (tick_ == speed_)
+			tick_ = 0;
+		tick_++;
+
+		if (tick_ == 1) {
+			patternDelay_--;
+			if (patternDelay_ < 0)
+				dispatchNotes();
+		} else {
+			for (int i = 0; i < nbVoices_; i++)
+				voices_[i].updateSoundWithEffect();
+		}
+
+		for (int i = 0; i < nbVoices_; i++)
+			voices_[i].updateSoundWithEnvelope();
+
+		for (int i = 0; i < nbVoices_; i++)
+			voices_[i].soundUpdate();
+
+		mixSample(_timer);
+	}
+
+	/**
+	 * Starts to play the XM. The time latency between a note is read and then
+	 * heard is approximatively of 100ms. If the XM is not loopable and finish,
+	 * you cannot restart it by invoking again this method.
+	 */
+	@Override
+	public void play() {
+		if (isAlive() == true || done_ == true)
+			return;
+
+		timer_ = new Timer();
+		tick_ = 0;
+		patternDelay_ = -1;
+
+		running_ = true;
+
+		start();
+	}
+	/**
+	 * Never call this method directly. Use play() instead.
+	 */
+	@Override
+	public void run() {
+		frequency_ = 44100;
+		gdxAudio.setVolume(1f);
+
+		int soundBufferLen = frequency_ * 4;
+		pcm_ = new byte[soundBufferLen];
+		pcms_ = new short[pcm_.length / 2];
+
+		long cumulTime = 0;
+
+		while (running_) {
+			long since = timer_.getDelta();
+			
+			float timerRate = 1000.0f / (BPM_ * 0.4f);
+			int intTimerRate = (int) Math.floor(timerRate);
+			
+			cumulTime += since;
+
+			while (cumulTime >= intTimerRate) {
+				cumulTime -= intTimerRate;
+				oneShot(intTimerRate);
+			}
+			doSleep((intTimerRate - cumulTime)-100);
+		}
+		done_ = true;
+		System.out.println("Done.");
+	}
+	/**
 	 * Sets the XM loopable or not. The method can be called at any time if the
 	 * song is still playing.
 	 * 
@@ -1604,78 +1597,4 @@ public class XMPlayer extends Thread {
 	public void setLoopable(boolean _b) {
 		loopable_ = _b;
 	}
-
-	/**
-	 * Gets the current reading position of the song.
-	 * 
-	 * @return The current position.
-	 */
-	public int getCurrentPos() {
-		return posInPattern_;
-	}
-
-	/**
-	 * Gets the current reading row of the song.
-	 * 
-	 * @return The current row.
-	 */
-	public int getCurrentRow() {
-		return posChanson_;
-	}
-
-	static final int MAXNBVOICES = 64;
-	static final int MAXNBSONGPAT = 256;
-	static final int MAXNBPATTERNS = 256;
-
-	static final int COLUMN_EFFECT_NONE = 0x0fff;
-	static final int COLUMN_EFFECT_VOLUMESLIDE = 0x01;
-	static final int COLUMN_EFFECT_PANSLIDE = 0x02;
-	static final int COLUMN_EFFECT_PORTAMENTO_TO = 0x03;
-
-	static final int MIN_PERIOD = 40;
-	static final int MAX_PERIOD = 11520;
-
-	int tick_;
-	int patternDelay_ = -1;
-
-	boolean running_;
-	boolean done_;
-
-	int posChanson_ = 0;
-	int posInPattern_;
-
-	Timer timer_;
-	int freq_;
-	byte pcm_[];
-	short[] pcms_;
-	// SourceDataLine line_;
-	ChannelsList chans_ = new ChannelsList();
-
-	boolean loopable_ = false;
-
-	int version_;
-	int sizHeaderInfo_;
-	int listLen_;
-	int posRestart_;
-	int nbVoices_;
-	byte songName_[] = new byte[20];
-	byte trackerName_[] = new byte[20];
-
-	int nbPatterns_;
-	int nbInstrus_;
-	int freqFlag_;
-	int speed_ = 6;
-	int BPM_ = 125;
-	int listPatterns_[] = new int[256];
-
-	Voice voices_[];
-	Pattern patterns_[];
-	Instru instrus_[];
-
-	int globalVolume_ = 64;
-	float mainVolume_ = 1.0f;
-
-	boolean bGotPatternLoop_;
-	int patternPosLoop_;
-	int patternLoopLeft_;
 }
