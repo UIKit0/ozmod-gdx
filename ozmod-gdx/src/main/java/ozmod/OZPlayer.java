@@ -9,7 +9,7 @@ public class OZPlayer {
 	public static enum ModType {
 		IT, MOD, S3M, XM;
 	}
-	public static OZModPlayer getPlayerFor(byte[] bytes, IAudioDevice pcmAudio) {
+	public static OZModPlayer getPlayerFor(IAudioDevice pcmAudio, byte[] bytes) {
 		SeekableBytes buffer_le=new SeekableBytes(bytes, Endian.LITTLEENDIAN);
 		ModType type = ModType.MOD;
 		identify: {
