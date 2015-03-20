@@ -1133,7 +1133,7 @@ public class S3MPlayer extends OZModPlayer {
 		chansList_.mix(nbsamp, pcm_);
 		ByteBuffer.wrap(pcm_).order(ByteOrder.BIG_ENDIAN).asShortBuffer()
 				.get(pcms_, 0, nbsamp * 2);
-		gdxAudio.writeSamples(pcms_, 0, nbsamp * 2);
+		pcmAudio.writeSamples(pcms_, 0, nbsamp * 2);
 	}
 	protected void oneShot(int _timer) {
 		if (tick_ == speed_)
@@ -1201,7 +1201,7 @@ public class S3MPlayer extends OZModPlayer {
 			doSleep((intTimerRate - cumulTime) / 2);
 
 		}
-		done_ = true;
+		done();
 	}
 
 	/**
@@ -1213,5 +1213,14 @@ public class S3MPlayer extends OZModPlayer {
 	 */
 	public void setLoopable(boolean _b) {
 		loopable_ = _b;
+	}
+	
+	@Override
+	public void setVolume(float _vol) {
+		this.globalVolume_=_vol;		
+	}
+	@Override
+	public float getVolume() {
+		return this.globalVolume_;
 	}
 }

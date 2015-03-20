@@ -694,6 +694,7 @@ public class MODPlayer extends OZModPlayer {
 	 * 
 	 * @return The current position.
 	 */
+	@Override
 	public int getCurrentPos() {
 		return posInPattern_;
 	}
@@ -703,6 +704,7 @@ public class MODPlayer extends OZModPlayer {
 	 * 
 	 * @return The current row.
 	 */
+	@Override
 	public int getCurrentRow() {
 		return posChanson_;
 	}
@@ -713,6 +715,7 @@ public class MODPlayer extends OZModPlayer {
 	 * 
 	 * @return The internal mix buffer.
 	 */
+	@Override
 	public byte[] getMixBuffer() {
 		return pcm_;
 	}
@@ -728,15 +731,6 @@ public class MODPlayer extends OZModPlayer {
 			return 1;
 		else
 			return h / _fine;
-	}
-
-	/**
-	 * Tells if the MOD is loopable or not.
-	 * 
-	 * @return true if loopable, false otherwhise.
-	 */
-	public boolean isLoopable() {
-		return loopable_;
 	}
 
 	/**
@@ -917,6 +911,7 @@ public class MODPlayer extends OZModPlayer {
 		start();
 	}
 
+	@Override
 	public void run() {
 		frequency_ = 44100;
 
@@ -953,26 +948,18 @@ public class MODPlayer extends OZModPlayer {
 			doSleep((intTimerRate - cumulTime) / 2);
 		}
 		done();
-		done_ = true;
-	}
-
-	/**
-	 * Sets the MOD loopable or not. The method can be called at any time if the
-	 * song is still playing.
-	 * 
-	 * @param _b
-	 *            true to loop the song, false otherwhise.
-	 */
-	public void setLoopable(boolean _b) {
-		loopable_ = _b;
 	}
 
 	public void setPanPower(float _p) {
 		panPower_ = _p;
 	}
 
+	@Override
 	public void setVolume(float _vol) {
 		MODvolume_ = _vol;
 	}
-
+	@Override
+	public float getVolume() {
+		return MODvolume_;
+	}
 }

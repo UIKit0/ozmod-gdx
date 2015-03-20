@@ -1760,17 +1760,6 @@ public class ITPlayer extends OZModPlayer {
 		}
 	}
 
-	/**
-	 * Stops the IT. Once a IT is stopped, it cannot be restarted.
-	 */
-	public void done() {
-		running_ = false;
-		try {
-			join();
-		} catch (InterruptedException e) {
-		}
-	}
-
 	protected int findFreeVC() {
 		int i, j;
 		for (i = 0; i < nbVCs_; i++) {
@@ -1804,6 +1793,7 @@ public class ITPlayer extends OZModPlayer {
 	 * 
 	 * @return The current position.
 	 */
+	@Override
 	public int getCurrentPos() {
 		return songPos_;
 	}
@@ -1813,6 +1803,7 @@ public class ITPlayer extends OZModPlayer {
 	 * 
 	 * @return The current row.
 	 */
+	@Override
 	public int getCurrentRow() {
 		return songRow_;
 	}
@@ -1823,6 +1814,7 @@ public class ITPlayer extends OZModPlayer {
 	 * 
 	 * @return The internal mix buffer.
 	 */
+	@Override
 	public byte[] getMixBuffer() {
 		return pcm_;
 	}
@@ -1837,15 +1829,6 @@ public class ITPlayer extends OZModPlayer {
 		if (c5speed != 0)
 			ret = h / c5speed;
 		return ret;
-	}
-
-	/**
-	 * Tells if the IT is loopable or not.
-	 * 
-	 * @return true if loopable, false otherwhise.
-	 */
-	public boolean isLoopable() {
-		return loopable_;
 	}
 
 	/**
@@ -2360,7 +2343,7 @@ public class ITPlayer extends OZModPlayer {
 		chansList_.mix(nbsamp, pcm_);
 		ByteBuffer.wrap(pcm_).order(ByteOrder.BIG_ENDIAN).asShortBuffer()
 				.get(pcms_, 0, nbsamp * 2);
-		gdxAudio.writeSamples(pcms_, 0, nbsamp * 2);
+		pcmAudio.writeSamples(pcms_, 0, nbsamp * 2);
 	}
 
 	@Override
@@ -2436,8 +2419,7 @@ public class ITPlayer extends OZModPlayer {
 		return value;
 	}
 
-	protected void readblock(SeekableBytes in) // gets block of compressed data
-												// from file
+	protected void readblock(SeekableBytes in)
 	{
 		int size;
 		size = in.readUShort();
@@ -2513,18 +2495,7 @@ public class ITPlayer extends OZModPlayer {
 				doSleep((intTimerRate - cumulTime) / 2);
 			}
 		}
-		done_ = true;
-	}
-
-	/**
-	 * Sets the IT loopable or not. The method can be called at any time if the
-	 * song is still playing.
-	 * 
-	 * @param _b
-	 *            true to loop the song, false otherwhise.
-	 */
-	public void setLoopable(boolean _b) {
-		loopable_ = _b;
+		done();
 	}
 
 	protected int shr(int val, int shift) {
@@ -2600,7 +2571,14 @@ public class ITPlayer extends OZModPlayer {
 					voice.envPitch_ = -1;
 				voice.bGotFilterEnv_ = false;
 			}
-
 		}
+	}
+	@Override
+	public void setVolume(float _vol) {
+		this.vol_=_vol;		
+	}
+	@Override
+	public float getVolume() {
+		return vol_;
 	}
 }

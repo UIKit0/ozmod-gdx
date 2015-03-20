@@ -1182,6 +1182,7 @@ public class XMPlayer extends OZModPlayer {
 	public int getCurrentRow() {
 		return posChanson_;
 	}
+	
 	protected int getFreq(int period) {
 		int okt;
 		int frequency;
@@ -1247,14 +1248,7 @@ public class XMPlayer extends OZModPlayer {
 
 		return v1 + ((int) (di * dv) / dp);
 	}
-	/**
-	 * Tells if the XM is loopable or not.
-	 * 
-	 * @return true if loopable, false otherwhise.
-	 */
-	public boolean isLoopable() {
-		return loopable_;
-	}
+	
 
 	/**
 	 * Loads the XM.
@@ -1263,6 +1257,7 @@ public class XMPlayer extends OZModPlayer {
 	 *            An instance to a PipeIn Class to read data from disk or URL.
 	 * @return NOERR if no error occured.
 	 */
+	@Override
 	public void load(byte[] bytes) {
 		SeekableBytes _input=new SeekableBytes(bytes, Endian.LITTLEENDIAN);
 		byte tmp[] = new byte[20];
@@ -1585,17 +1580,15 @@ public class XMPlayer extends OZModPlayer {
 			}
 			doSleep((intTimerRate - cumulTime)-100);
 		}
-		done_ = true;
-		System.out.println("Done.");
+		done();
 	}
-	/**
-	 * Sets the XM loopable or not. The method can be called at any time if the
-	 * song is still playing.
-	 * 
-	 * @param _b
-	 *            true to loop the song, false otherwhise.
-	 */
-	public void setLoopable(boolean _b) {
-		loopable_ = _b;
+	
+	@Override
+	public void setVolume(float _vol) {
+		this.mainVolume_=_vol;
+	}
+	@Override
+	public float getVolume() {
+		return mainVolume_;
 	}
 }
