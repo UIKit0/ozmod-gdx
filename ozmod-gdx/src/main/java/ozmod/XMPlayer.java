@@ -46,7 +46,7 @@ public class XMPlayer extends OZModPlayer {
 		int nbPointsVol;
 		int nbSamples;
 		int panType;
-		byte reserved[] = new byte[22];
+		int reserved;
 		Sample samples[];
 		int sampleTable[] = new int[96];
 		int startPanLoop;
@@ -1398,16 +1398,19 @@ public class XMPlayer extends OZModPlayer {
 			Instru instru = new Instru();
 			instrus_[i] = instru;
 
-			int headerSize;
-			int extra_size;
-			headerSize = _input.readInt();
 			lseek = _input.tell();
+			
+			int instrumentHeaderSize;
+			int extra_size;
+			instrumentHeaderSize = _input.readInt();
 			_input.read(instru.name, 0, 22);
 			instru.type = _input.readUByte();
 			instru.nbSamples = _input.readUShort();
 
 			if ((instru.nbSamples == 0) || (instru.nbSamples > 255)) {
-				_input.forward(headerSize - 29);
+				System.out.println("Fast forward: "+(instrumentHeaderSize-29));
+//				_input.forward(instrumentHeaderSize - 29);
+				_input.seek(lseek);
 				continue;
 			}
 
@@ -1436,7 +1439,7 @@ public class XMPlayer extends OZModPlayer {
 			instru.vibratoProf = _input.readUByte();
 			instru.vibratoSpeed = _input.readUByte();
 			instru.fadeOut = _input.readUShort();
-			_input.read(instru.reserved, 0, 11 * 2);
+			instru.reserved = _input.readUShort();
 
 			// Inside the instruments, dispatch samples info
 			instru.samples = new Sample[instru.nbSamples];
