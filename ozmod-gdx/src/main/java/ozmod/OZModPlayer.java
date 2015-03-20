@@ -47,6 +47,9 @@ public abstract class OZModPlayer extends Thread {
 	}
 
 	protected void doSleep(long ms) {
+		if (ms<=0) {
+			return;
+		}
 		try {
 			Thread.sleep(ms);
 		} catch (InterruptedException e) {

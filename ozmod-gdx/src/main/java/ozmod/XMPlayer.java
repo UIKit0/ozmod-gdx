@@ -1264,7 +1264,7 @@ public class XMPlayer extends OZModPlayer {
 	 * @return NOERR if no error occured.
 	 */
 	public void load(byte[] bytes) {
-		SeekableBytes _input=new SeekableBytes(bytes, Endian.BIGENDIAN);
+		SeekableBytes _input=new SeekableBytes(bytes, Endian.LITTLEENDIAN);
 		byte tmp[] = new byte[20];
 		int lseek;
 

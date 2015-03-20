@@ -867,7 +867,7 @@ public class S3MPlayer extends OZModPlayer {
 	@Override
 	public void load(byte[] bytes) {
 
-		SeekableBytes _input = new SeekableBytes(bytes, Endian.BIGENDIAN);
+		SeekableBytes _input = new SeekableBytes(bytes, Endian.LITTLEENDIAN);
 
 		byte tmp[] = new byte[4];
 
