@@ -904,7 +904,6 @@ public class MODPlayer extends OZModPlayer {
 		if (isAlive() == true || done_ == true)
 			return;
 
-		timer_ = new Timer();
 		tick_ = 0;
 		patternDelay_ = -1;
 

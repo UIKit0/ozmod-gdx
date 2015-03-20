@@ -22,7 +22,7 @@ public abstract class OZModPlayer extends Thread {
 	protected int speed_;	
 	protected final String TAG;
 	protected int tick_;
-	protected Timer timer_;
+	protected final Timer timer_;
 	/**
 	 * Provide Interface To Audio device. Must accept 44.1KHz stereo audio!
 	 * @param audioDevice
@@ -30,6 +30,7 @@ public abstract class OZModPlayer extends Thread {
 	public OZModPlayer(IAudioDevice audioDevice) {
 		TAG=this.getClass().getSimpleName();
 		gdxAudio = audioDevice;
+		timer_=new Timer();
 	}
 	
 	protected abstract void dispatchNotes();
@@ -89,4 +90,8 @@ public abstract class OZModPlayer extends Thread {
 	}
 	
 	public abstract void load(byte[] bytes);
+
+	public void setLoopable(boolean loopable) {
+		loopable_=loopable;		
+	}
 }

@@ -1165,7 +1165,6 @@ public class S3MPlayer extends OZModPlayer {
 		if (isAlive() == true || done_ == true)
 			return;
 
-		timer_ = new Timer();
 		running_ = true;
 
 		start();

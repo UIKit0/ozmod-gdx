@@ -1865,7 +1865,7 @@ public class ITPlayer extends OZModPlayer {
 		int byt;
 		int wor;
 
-		buffer = new SeekableBytes(bytes, Endian.BIGENDIAN);
+		buffer = new SeekableBytes(bytes, Endian.LITTLEENDIAN);
 
 		if (nbVCs_ == 0)
 			nbVCs_ = 80;
@@ -2411,7 +2411,6 @@ public class ITPlayer extends OZModPlayer {
 	public void play() {
 		if (isAlive() == true || done_ == true)
 			return;
-
 		running_ = true;
 		start();
 	}
