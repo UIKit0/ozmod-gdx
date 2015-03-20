@@ -5,7 +5,11 @@ import ozmod.OZMod.ERR;
 @SuppressWarnings("serial")
 public class OZModRuntimeError extends RuntimeException {
 
-	private ERR err;
+	private final ERR err;
+
+	public ERR getErr() {
+		return err;
+	}
 
 	public OZModRuntimeError(ERR error) {
 		this.err = error;
