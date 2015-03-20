@@ -101,15 +101,15 @@ public class SeekableBytes {
 	 * 
 	 * @return The unsigned word.
 	 */
-	public short readUShort() {
+	public int readUShort() {
 		int b1 = content_[pos_++];
 		int b2 = content_[pos_++];
 		b1 &= 0xff;
 		b2 &= 0xff;
 		if (Endian.BIGENDIAN.equals(endianness_))
-			return (short) ((b1 << 8) | b2);
+			return (int) ((b1 << 8) | b2);
 		else
-			return (short) ((b2 << 8) | b1);
+			return (int) ((b2 << 8) | b1);
 	}
 
 	/**
