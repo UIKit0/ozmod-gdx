@@ -42,7 +42,7 @@ public class SeekableBytes {
 	 *            transfer.
 	 */
 	public SeekableBytes(byte[] buffer, Endian _endianness) {
-		content_=buffer;
+		this.buffer=buffer;
 		endianness_=_endianness;
 	}
 
@@ -58,7 +58,7 @@ public class SeekableBytes {
 	 */
 	public void read(byte[] _buf, int _off, int _len) {
 		for (int i = _off; i < _off + _len; i++)
-			_buf[i] = content_[pos_++];
+			_buf[i] = buffer[pos_++];
 	}
 
 	/**
@@ -67,7 +67,7 @@ public class SeekableBytes {
 	 * @return The signed byte.
 	 */
 	public byte readByte() {
-		return content_[pos_++];
+		return buffer[pos_++];
 	}
 
 	/**
@@ -76,7 +76,7 @@ public class SeekableBytes {
 	 * @return The unsigned byte.
 	 */
 	public int readUByte() {
-		return content_[pos_++] & 0xff;
+		return buffer[pos_++] & 0xff;
 	}
 
 	/**
@@ -85,8 +85,8 @@ public class SeekableBytes {
 	 * @return The signed word.
 	 */
 	public short readShort() {
-		int b1 = content_[pos_++];
-		int b2 = content_[pos_++];
+		int b1 = buffer[pos_++];
+		int b2 = buffer[pos_++];
 
 		if (Endian.BIGENDIAN.equals(endianness_)) {
 			b2 &= 0xff;
@@ -102,8 +102,8 @@ public class SeekableBytes {
 	 * @return The unsigned word.
 	 */
 	public int readUShort() {
-		int b1 = content_[pos_++];
-		int b2 = content_[pos_++];
+		int b1 = buffer[pos_++];
+		int b2 = buffer[pos_++];
 		b1 &= 0xff;
 		b2 &= 0xff;
 		if (Endian.BIGENDIAN.equals(endianness_))
@@ -118,10 +118,10 @@ public class SeekableBytes {
 	 * @return The signed integer.
 	 */
 	public int readInt() {
-		int b1 = content_[pos_++];
-		int b2 = content_[pos_++];
-		int b3 = content_[pos_++];
-		int b4 = content_[pos_++];
+		int b1 = buffer[pos_++];
+		int b2 = buffer[pos_++];
+		int b3 = buffer[pos_++];
+		int b4 = buffer[pos_++];
 		b1 &= 0xff;
 		b2 &= 0xff;
 		b3 &= 0xff;
@@ -173,9 +173,11 @@ public class SeekableBytes {
 		pos_ += _fw;
 	}
 
-	// File file_ = null;
-	// URL url_ = null;
-	byte[] content_;
-	int pos_ = 0;
-	protected Endian endianness_;
+	private final byte[] buffer;
+	private int pos_ = 0;
+	private final Endian endianness_;
+	
+	public boolean hasMore() {
+		return pos_+1<buffer.length;
+	}
 }
