@@ -11,6 +11,7 @@ public abstract class OZModPlayer extends Thread {
 	public static interface IAudioDevice {
 		void writeSamples(short[] samples, int offset, int numSamples);
 		void setVolume(float f);
+		void dispose();
 	};
 
 	protected ChannelsList chansList_ = new ChannelsList();
@@ -50,6 +51,7 @@ public abstract class OZModPlayer extends Thread {
 		short[] silence=new short[4096];
 		Arrays.fill(silence, (short)0);
 		pcmAudio.writeSamples(silence, 0, 4096);
+		pcmAudio.dispose();
 		System.out.println("OZModPlayer: DONE");
 		running_ = false;
 		doWhenDone();
