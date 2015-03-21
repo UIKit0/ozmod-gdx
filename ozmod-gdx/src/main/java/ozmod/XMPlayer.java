@@ -1591,7 +1591,7 @@ public class XMPlayer extends OZModPlayer {
 				cumulTime -= intTimerRate;
 				oneShot(intTimerRate);
 			}
-			doSleep((intTimerRate - cumulTime)-100);
+			doSleep((intTimerRate - cumulTime)/2);
 			totalTime += since;
 			if (maxPlayTime>0 && totalTime>maxPlayTime) {
 				done();

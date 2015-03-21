@@ -10,6 +10,7 @@ public abstract class OZModPlayer extends Thread {
 
 	public static interface IAudioDevice {
 		void writeSamples(short[] samples, int offset, int numSamples);
+		void setVolume(float f);
 	};
 
 	protected ChannelsList chansList_ = new ChannelsList();
@@ -46,6 +47,9 @@ public abstract class OZModPlayer extends Thread {
 	 * Stops playing and calls "doWhenDone" runnables.
 	 */
 	public void done() {
+		short[] silence=new short[4096];
+		Arrays.fill(silence, (short)0);
+		pcmAudio.writeSamples(silence, 0, 4096);
 		System.out.println("OZModPlayer: DONE");
 		running_ = false;
 		doWhenDone();
