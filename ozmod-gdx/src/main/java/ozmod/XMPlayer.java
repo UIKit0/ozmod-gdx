@@ -1400,17 +1400,18 @@ public class XMPlayer extends OZModPlayer {
 
 			lseek = _input.tell();
 			
-			int instrumentHeaderSize;
+			int headerSize;
 			int extra_size;
-			instrumentHeaderSize = _input.readInt();
+			headerSize = _input.readInt();
 			_input.read(instru.name, 0, 22);
 			instru.type = _input.readUByte();
 			instru.nbSamples = _input.readUShort();
 
+			/*
+			 * What am I for?
+			 */
 			if ((instru.nbSamples == 0) || (instru.nbSamples > 255)) {
-				System.out.println("Fast forward: "+(instrumentHeaderSize-29));
-//				_input.forward(instrumentHeaderSize - 29);
-				_input.seek(lseek);
+				_input.forward(headerSize - 29);
 				continue;
 			}
 
